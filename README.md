@@ -4,6 +4,16 @@ Interactive Elden Ring map for two players. Each player marks what they find, se
 
 Built with **Next.js 16** (App Router), React 19, TypeScript, Leaflet (react-leaflet) and zustand. Pages and API live in a single project.
 
+## Screenshots
+
+![Desktop: shared progress, both players' next destinations and a pin popup](docs/screenshots/desktop.jpg)
+
+| Login | Phone: full-screen map and the actions drawer |
+| --- | --- |
+| ![Login with character name and password](docs/screenshots/login.jpg) | ![Phone layout with the map and the open sidebar drawer](docs/screenshots/phone.jpg) |
+
+The screenshots use demo data: two players with some Limgrave pins found and a next destination each.
+
 ## Getting started
 
 ```sh
