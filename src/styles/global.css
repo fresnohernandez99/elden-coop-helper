@@ -1,0 +1,115 @@
+:root {
+  color-scheme: dark; /* dark scrollbars and form controls */
+  --bg: #121212;
+  --panel: #1b1a17;
+  --panel-2: #24221d;
+  --overlay: rgba(20, 19, 16, 0.92);
+  --line: #3a362c;
+  --text: #e8e2d0;
+  --muted: #9a927c;
+  --gold: #c9a74a;
+  --sidebar-width: 320px;
+
+  /* Defaults; AppLayout replaces them with the colors from the server. */
+  --p1: #e3b341;
+  --p2: #4fb3bf;
+  --me: var(--p1);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.4 system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+}
+
+button,
+input {
+  font: inherit;
+  color: inherit;
+}
+
+input[type='text'],
+input[type='search'] {
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+input:focus {
+  outline: 1px solid var(--gold);
+}
+
+small {
+  color: var(--muted);
+}
+
+/* --- Leaflet in dark theme ------------------------------------------------- */
+
+.leaflet-popup-content-wrapper,
+.leaflet-popup-tip {
+  border: 1px solid var(--line);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.leaflet-popup-content {
+  margin: 12px;
+}
+
+.leaflet-container {
+  font: inherit;
+}
+
+.leaflet-container a {
+  color: var(--gold);
+}
+
+.leaflet-container a.leaflet-popup-close-button {
+  color: var(--muted);
+}
+
+.leaflet-bar a {
+  border-color: var(--line);
+  background: var(--panel);
+  color: var(--text);
+}
+
+.leaflet-bar a:hover {
+  background: var(--panel-2);
+}
+
+/* --- Touch screens ------------------------------------------------------------ */
+
+@media (pointer: coarse) {
+  /* 16px keeps iOS from zooming in when an input gets focus. */
+  input[type='text'],
+  input[type='search'],
+  input[type='password'] {
+    padding: 10px 12px;
+    font-size: 16px;
+  }
+
+  input[type='checkbox'] {
+    width: 20px;
+    height: 20px;
+  }
+
+  .leaflet-touch .leaflet-bar a {
+    width: 40px;
+    height: 40px;
+    line-height: 40px;
+  }
+}

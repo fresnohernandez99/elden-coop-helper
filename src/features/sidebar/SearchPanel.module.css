@@ -1,0 +1,73 @@
+.check {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  cursor: pointer;
+}
+
+.results {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 0;
+  border-bottom: 1px solid var(--line);
+}
+
+.result {
+  display: grid;
+  flex: 1;
+  padding: 0;
+  border: 0;
+  background: none;
+  text-align: left;
+  cursor: pointer;
+}
+
+.result:hover span {
+  color: var(--gold);
+}
+
+.checkButton {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: transparent;
+  color: transparent;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.checked {
+  border-color: var(--me);
+  background: var(--me);
+  color: #111;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+@media (pointer: coarse) {
+  .check {
+    padding: 6px 0;
+  }
+
+  .item {
+    align-items: center;
+    padding: 8px 0;
+  }
+
+  .checkButton {
+    width: 34px;
+    height: 34px;
+  }
+}

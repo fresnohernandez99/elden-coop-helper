@@ -1,0 +1,88 @@
+import { useMemo } from 'react';
+import { PLAYER_IDS } from '@/config/constants';
+import { useCoopStore } from '@/features/coop/coopStore';
+import { isFoundBy } from '@/features/coop/selectors';
+import { usePins } from '@/features/pins/PinsContext';
+import { useEnabledCategories } from '@/features/pins/useEnabledCategories';
+import { useUiStore } from '@/features/ui/uiStore';
+import { Section } from '@/shared/ui/Section';
+import { assetUrl } from '@/shared/utils/assetUrl';
+import type { PlayerId } from '@/types/domain';
+import styles from './CategoryFilter.module.css';
+
+interface CategoryStats {
+  name: string;
+  icon: string;
+  total: number;
+  found: Record<PlayerId, number>;
+}
+
+/** Categories of the current map with how many pins each player found. */
+function useCategoryStats(): CategoryStats[] {
+  const { pins } = usePins();
+  const currentMap = useUiStore((s) => s.currentMap);
+  const players = useCoopStore((s) => s.players);
+
+  return useMemo(() => {
+    const stats = new Map<string, CategoryStats>();
+    for (const pin of pins) {
+      if (pin.area !== currentMap || !pin.latlng) continue;
+      let entry = stats.get(pin.category);
+      if (!entry) {
+        entry = { name: pin.category, icon: pin.icon, total: 0, found: { p1: 0, p2: 0 } };
+        stats.set(pin.category, entry);
+      }
+      entry.total++;
+      for (const p of PLAYER_IDS) if (isFoundBy(players, p, pin.id)) entry.found[p]++;
+    }
+    return [...stats.values()].sort((a, b) => b.total - a.total);
+  }, [pins, currentMap, players]);
+}
+
+export function CategoryFilter() {
+  const { allCategories } = usePins();
+  const stats = useCategoryStats();
+  const enabled = useEnabledCategories();
+  const setCategoryEnabled = useUiStore((s) => s.setCategoryEnabled);
+  const setEnabledCategories = useUiStore((s) => s.setEnabledCategories);
+
+  const actions = (
+    <span className={styles.links}>
+      <button type="button" onClick={() => setEnabledCategories(null)}>
+        all
+      </button>
+      {' · '}
+      <button type="button" onClick={() => setEnabledCategories([])}>
+        none
+      </button>
+    </span>
+  );
+
+  return (
+    <Section title="Categories" actions={actions}>
+      <ul className={styles.list}>
+        {stats.map((c) => (
+          <li key={c.name}>
+            <label className={styles.item}>
+              <input
+                type="checkbox"
+                checked={enabled.has(c.name)}
+                onChange={(e) => setCategoryEnabled(c.name, e.target.checked, allCategories)}
+              />
+              <img src={assetUrl(c.icon)} alt="" />
+              <span className={styles.name}>{c.name}</span>
+              <span className={styles.counts}>
+                {PLAYER_IDS.map((p) => (
+                  <span key={p} style={{ color: `var(--${p})` }}>
+                    {c.found[p]}
+                  </span>
+                ))}
+                <span className={styles.muted}>/ {c.total}</span>
+              </span>
+            </label>
+          </li>
+        ))}
+      </ul>
+    </Section>
+  );
+}

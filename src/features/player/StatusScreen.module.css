@@ -1,0 +1,8 @@
+.screen {
+  display: grid;
+  place-items: center;
+  height: 100%;
+  padding: 16px;
+  text-align: center;
+  color: var(--muted);
+}

@@ -1,0 +1,59 @@
+.links button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+
+.item img {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.counts {
+  display: flex;
+  gap: 6px;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+@media (pointer: coarse) {
+  .item {
+    gap: 10px;
+    padding: 8px 0;
+  }
+
+  .links button {
+    padding: 6px 4px;
+    font-size: 14px;
+  }
+}

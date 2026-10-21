@@ -1,0 +1,76 @@
+.wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.map {
+  position: absolute;
+  inset: 0;
+  background: #0b0b0b;
+}
+
+.placing {
+  cursor: crosshair;
+}
+
+.sidebarToggle {
+  display: none;
+}
+
+.hint {
+  position: absolute;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  max-width: calc(100% - 32px);
+  padding: 8px 14px;
+  border: 1px solid var(--me);
+  border-radius: 6px;
+  background: var(--overlay);
+}
+
+.link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  cursor: pointer;
+}
+
+/* Leave room for the iPhone home indicator. */
+.map :global(.leaflet-bottom) {
+  margin-bottom: env(safe-area-inset-bottom);
+}
+
+.map :global(.leaflet-right) {
+  margin-right: env(safe-area-inset-right);
+}
+
+@media (max-width: 800px) {
+  .sidebarToggle {
+    display: grid;
+    place-items: center;
+    position: absolute;
+    top: calc(12px + env(safe-area-inset-top));
+    left: calc(12px + env(safe-area-inset-left));
+    z-index: 1000;
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 22px;
+    background: var(--overlay);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Next to the menu button instead of centered, so they never overlap. */
+  .hint {
+    top: calc(12px + env(safe-area-inset-top));
+    left: calc(68px + env(safe-area-inset-left));
+    right: 12px;
+    max-width: none;
+    transform: none;
+    font-size: 13px;
+  }
+}

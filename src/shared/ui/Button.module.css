@@ -1,0 +1,38 @@
+.button {
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+.button:hover {
+  border-color: var(--gold);
+}
+
+.primary {
+  border-color: var(--me);
+  background: var(--me);
+  color: #111;
+  font-weight: 600;
+}
+
+.small {
+  padding: 2px 8px;
+  font-size: 12px;
+}
+
+/* Finger-sized targets on touch screens. */
+@media (pointer: coarse) {
+  .button {
+    min-height: 40px;
+    padding: 8px 14px;
+  }
+
+  .small {
+    min-height: 34px;
+    padding: 6px 12px;
+    font-size: 13px;
+  }
+}

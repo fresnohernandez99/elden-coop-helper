@@ -1,0 +1,64 @@
+.screen {
+  display: grid;
+  place-items: center;
+  min-height: 100%;
+  padding: calc(16px + env(safe-area-inset-top)) 16px calc(16px + env(safe-area-inset-bottom));
+  background: radial-gradient(ellipse at top, #2a2518 0%, var(--bg) 70%);
+}
+
+.card {
+  display: grid;
+  gap: 14px;
+  width: min(360px, 100%);
+  padding: 28px 24px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--panel);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  --me: var(--gold);
+}
+
+.title {
+  margin: 0 0 6px;
+  text-align: center;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 26px;
+  font-weight: normal;
+  letter-spacing: 0.5px;
+  color: var(--gold);
+}
+
+.field {
+  display: grid;
+  gap: 5px;
+}
+
+.field span {
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.field input {
+  width: 100%;
+  padding: 9px 11px;
+  font-size: 16px; /* keeps iOS from zooming in on focus */
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.error {
+  margin: 0;
+  color: #e07a6a;
+}
+
+.card button {
+  padding: 10px;
+}
+
+.card button:disabled {
+  opacity: 0.6;
+  cursor: wait;
+}

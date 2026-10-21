@@ -1,0 +1,49 @@
+.popup p {
+  margin: 6px 0;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.head img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+}
+
+.head strong {
+  display: block;
+  font-size: 15px;
+}
+
+.head small {
+  color: var(--muted);
+}
+
+.image {
+  display: block;
+  width: 100%;
+  margin-top: 8px;
+  border-radius: 4px;
+}
+
+.who {
+  margin: 8px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 8px 0;
+}
+
+.note {
+  font-style: italic;
+  color: var(--muted);
+}

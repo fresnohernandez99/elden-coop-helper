@@ -1,0 +1,55 @@
+.pin {
+  position: relative;
+  width: 28px;
+  height: 28px;
+}
+
+.pin img {
+  width: 28px;
+  height: 28px;
+  object-fit: contain;
+  filter: drop-shadow(0 1px 2px #000);
+}
+
+.foundByMe img {
+  opacity: 0.4;
+  filter: grayscale(0.7);
+}
+
+.badges {
+  position: absolute;
+  right: -4px;
+  bottom: -3px;
+  display: flex;
+}
+
+.badge {
+  width: 10px;
+  height: 10px;
+  margin-left: -3px;
+  border: 1.5px solid #111;
+  border-radius: 50%;
+}
+
+.flag {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 2px;
+  height: 34px;
+  background: #fff;
+  box-shadow: 0 0 3px #000;
+}
+
+.flag span {
+  position: absolute;
+  top: 0;
+  left: 2px;
+  padding: 2px 7px;
+  border-radius: 0 4px 4px 0;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.6);
+  white-space: nowrap;
+  font-size: 12px;
+  font-weight: 700;
+  color: #111;
+}

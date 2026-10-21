@@ -1,0 +1,33 @@
+.card {
+  margin-bottom: 8px;
+  padding: 8px 10px;
+  border-left: 3px solid;
+  border-radius: 0 6px 6px 0;
+  background: var(--panel-2);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.actions {
+  display: flex;
+  gap: 4px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.note {
+  font-style: italic;
+  color: var(--muted);
+}
+
+.form {
+  display: grid;
+  gap: 6px;
+}

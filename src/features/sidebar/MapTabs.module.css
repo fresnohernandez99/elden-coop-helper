@@ -1,0 +1,27 @@
+.tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.tab {
+  flex: 1;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: transparent;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.tab[aria-selected='true'] {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #111;
+}
+
+@media (pointer: coarse) {
+  .tab {
+    padding: 10px 8px;
+  }
+}

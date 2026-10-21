@@ -1,0 +1,6 @@
+/* Fixed to the viewport: the map page never scrolls, only the sidebar does. */
+.layout {
+  position: fixed;
+  inset: 0;
+  display: flex;
+}
