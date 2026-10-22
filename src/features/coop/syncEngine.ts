@@ -3,12 +3,16 @@ import type { SyncApi } from '@/api/syncApi';
 import { POLL_INTERVAL_MS } from '@/config/constants';
 import { showToast } from '@/features/notifications/toastStore';
 import type { SyncCatalog } from '@/sync/catalog';
+import type { PlayerSnapshot } from '@/sync/protocol';
 import { CatalogMismatchError, decodeSnapshot, encodeSnapshot } from '@/sync/snapshot';
-import { otherPlayer, useCoopStore } from './coopStore';
+import type { PlayerId } from '@/types/domain';
+import { ownProgress, useCoopStore } from './coopStore';
 
 const PUSH_DELAY_MS = 250; // groups several quick clicks into one request
 
 interface SyncEngineOptions {
+  /** Configured player slots; anything else from the server is ignored. */
+  players: readonly PlayerId[];
   /** Called when the session expired (401). */
   onUnauthorized: () => void;
 }
@@ -17,18 +21,21 @@ interface SyncEngineOptions {
  * Keeps progress in sync with the server:
  * - Polls every POLL_INTERVAL_MS while the tab is visible.
  * - Sends your own snapshot only when the server lacks the latest revision.
- * - Receives the other player's only when it is newer than the one you have.
+ * - Receives only the snapshots stored since the last poll, plus who is online.
  *
  * Returns a function that stops it.
  */
-export function startSyncEngine(api: SyncApi, catalog: SyncCatalog, { onUnauthorized }: SyncEngineOptions): () => void {
+export function startSyncEngine(api: SyncApi, catalog: SyncCatalog, options: SyncEngineOptions): () => void {
+  const configured = new Set(options.players);
+  let epoch = 0; // server epoch, see src/sync/protocol.ts
+  let knownSeq = 0; // last server sequence received
   let serverRev = 0; // your revision held by the server
-  let ignoredOtherRev = 0; // the other player's revision that could not be read (another catalog)
   let running = false;
   let rerun = false;
   let stopped = false;
   let pushTimer: ReturnType<typeof setTimeout> | undefined;
   let offlineNotified = false;
+  let mismatchNotified = false;
 
   async function sync() {
     if (stopped) return;
@@ -38,23 +45,25 @@ export function startSyncEngine(api: SyncApi, catalog: SyncCatalog, { onUnauthor
     }
     running = true;
     try {
-      const { me, players } = useCoopStore.getState();
-      const own = players[me];
+      const own = ownProgress(useCoopStore.getState());
       const response = await api.sync({
+        epoch,
+        knownSeq,
         rev: own.rev,
-        knownOtherRev: Math.max(players[otherPlayer(me)].rev, ignoredOtherRev),
         snapshot: serverRev === own.rev ? null : encodeSnapshot(own, catalog),
       });
-      serverRev = response.storedRev;
+      ({ epoch, seq: knownSeq, storedRev: serverRev } = response);
       offlineNotified = false;
 
-      if (response.otherSnapshot) receiveOther(response.otherSnapshot, response.otherRev);
+      const { me, setOnline } = useCoopStore.getState();
+      response.snapshots.forEach(receive);
+      setOnline(response.online.filter((p) => p !== me && configured.has(p)));
       // Something changed while the request was in flight: send again.
-      if (useCoopStore.getState().players[me].rev !== serverRev) rerun = true;
+      if (ownProgress(useCoopStore.getState()).rev !== serverRev) rerun = true;
     } catch (error) {
       if (error instanceof ApiError && error.status === 401) {
         stop();
-        onUnauthorized();
+        options.onUnauthorized();
         return;
       }
       if (!offlineNotified) {
@@ -70,13 +79,14 @@ export function startSyncEngine(api: SyncApi, catalog: SyncCatalog, { onUnauthor
     }
   }
 
-  function receiveOther(snapshot: Uint8Array, rev: number) {
+  function receive({ player, rev, snapshot }: PlayerSnapshot) {
+    if (!configured.has(player)) return;
     try {
-      useCoopStore.getState().receiveOther(decodeSnapshot(snapshot, catalog), rev);
+      useCoopStore.getState().receivePlayer(player, decodeSnapshot(snapshot, catalog), rev);
     } catch (error) {
       if (!(error instanceof CatalogMismatchError)) throw error;
-      ignoredOtherRev = rev;
-      showToast('The other player has a different map version; ask them to reload the page');
+      if (!mismatchNotified) showToast('Another player has a different map version; ask them to reload the page');
+      mismatchNotified = true;
     }
   }
 
@@ -93,7 +103,7 @@ export function startSyncEngine(api: SyncApi, catalog: SyncCatalog, { onUnauthor
 
   // Every local change is sent almost immediately.
   const unsubscribe = useCoopStore.subscribe((state, previous) => {
-    if (state.players[state.me].rev !== previous.players[previous.me].rev) schedulePush();
+    if (ownProgress(state).rev !== ownProgress(previous).rev) schedulePush();
   });
 
   function stop() {

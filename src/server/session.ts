@@ -2,14 +2,13 @@ import 'server-only';
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
-import { PLAYER_IDS } from '@/config/constants';
 import type { PlayerId } from '@/types/domain';
-import { getConfig } from './config';
+import { getConfig, isConfiguredPlayer } from './config';
 
 /**
  * Stateless session in a signed, httpOnly cookie: `<player>.<expires>.<signature>`.
  *
- * The signing key is derived from both passwords (plus SESSION_SECRET), so
+ * The signing key is derived from every password (plus SESSION_SECRET), so
  * changing a password logs everyone out.
  */
 
@@ -17,8 +16,9 @@ export const SESSION_COOKIE = 'ecm_session';
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
 
 function signingKey(): Buffer {
-  const { passwords, sessionSecret } = getConfig();
-  return createHash('sha256').update([passwords.p1, passwords.p2, sessionSecret].join('\0')).digest();
+  const { players, passwords, sessionSecret } = getConfig();
+  const secrets = [...players.map((id) => `${id}=${passwords[id]}`), sessionSecret];
+  return createHash('sha256').update(secrets.join('\0')).digest();
 }
 
 const sign = (payload: string) => createHmac('sha256', signingKey()).update(payload).digest('base64url');
@@ -33,7 +33,7 @@ export function createSessionToken(player: PlayerId): string {
 export function playerFromSessionToken(token: string | undefined): PlayerId | null {
   const [player, expires, signature, ...extra] = token?.split('.') ?? [];
   if (!player || !expires || !signature || extra.length > 0) return null;
-  if (!PLAYER_IDS.includes(player as PlayerId)) return null;
+  if (!isConfiguredPlayer(player as PlayerId)) return null;
   if (parseInt(expires, 36) * 1000 < Date.now()) return null;
 
   const expected = Buffer.from(sign(`${player}.${expires}`));

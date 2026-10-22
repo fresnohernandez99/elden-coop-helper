@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useCoopStore } from '@/features/coop/coopStore';
+import { ownProgress, useCoopStore } from '@/features/coop/coopStore';
 import { PinsProvider } from '@/features/pins/PinsContext';
 import { SessionProvider } from '@/features/session/SessionContext';
 import { useUiStore } from '@/features/ui/uiStore';
@@ -17,8 +17,9 @@ export interface PlayerAppProps {
 export function PlayerApp({ session }: PlayerAppProps) {
   // Load the progress stored in this browser once, before the first render.
   useState(() => {
-    useCoopStore.getState().initialize(session.me);
-    useUiStore.getState().setNextNote(useCoopStore.getState().players[session.me].next?.note ?? '');
+    const coop = useCoopStore.getState();
+    coop.initialize(session.me, session.players.map((p) => p.id));
+    useUiStore.getState().setNextNote(ownProgress(useCoopStore.getState()).next?.note ?? '');
   });
 
   const pins = usePinsData(initializeCurrentMap);

@@ -13,6 +13,10 @@
   /* Defaults; AppLayout replaces them with the colors from the server. */
   --p1: #e3b341;
   --p2: #4fb3bf;
+  --p3: #e07a5f;
+  --p4: #a88be0;
+  --p5: #7fbf6a;
+  --p6: #e889b5;
   --me: var(--p1);
 }
 

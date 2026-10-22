@@ -1,7 +1,6 @@
 import { useMemo } from 'react';
-import { PLAYER_IDS } from '@/config/constants';
 import { useCoopStore } from '@/features/coop/coopStore';
-import { isFoundBy } from '@/features/coop/selectors';
+import { isFoundBy, useVisiblePlayers } from '@/features/coop/selectors';
 import { usePins } from '@/features/pins/PinsContext';
 import { useEnabledCategories } from '@/features/pins/useEnabledCategories';
 import { useUiStore } from '@/features/ui/uiStore';
@@ -14,11 +13,11 @@ interface CategoryStats {
   name: string;
   icon: string;
   total: number;
-  found: Record<PlayerId, number>;
+  found: Partial<Record<PlayerId, number>>;
 }
 
-/** Categories of the current map with how many pins each player found. */
-function useCategoryStats(): CategoryStats[] {
+/** Categories of the current map with how many pins each visible player found. */
+function useCategoryStats(visiblePlayers: PlayerId[]): CategoryStats[] {
   const { pins } = usePins();
   const currentMap = useUiStore((s) => s.currentMap);
   const players = useCoopStore((s) => s.players);
@@ -29,19 +28,20 @@ function useCategoryStats(): CategoryStats[] {
       if (pin.area !== currentMap || !pin.latlng) continue;
       let entry = stats.get(pin.category);
       if (!entry) {
-        entry = { name: pin.category, icon: pin.icon, total: 0, found: { p1: 0, p2: 0 } };
+        entry = { name: pin.category, icon: pin.icon, total: 0, found: {} };
         stats.set(pin.category, entry);
       }
       entry.total++;
-      for (const p of PLAYER_IDS) if (isFoundBy(players, p, pin.id)) entry.found[p]++;
+      for (const p of visiblePlayers) if (isFoundBy(players, p, pin.id)) entry.found[p] = (entry.found[p] ?? 0) + 1;
     }
     return [...stats.values()].sort((a, b) => b.total - a.total);
-  }, [pins, currentMap, players]);
+  }, [pins, currentMap, players, visiblePlayers]);
 }
 
 export function CategoryFilter() {
   const { allCategories } = usePins();
-  const stats = useCategoryStats();
+  const visiblePlayers = useVisiblePlayers();
+  const stats = useCategoryStats(visiblePlayers);
   const enabled = useEnabledCategories();
   const setCategoryEnabled = useUiStore((s) => s.setCategoryEnabled);
   const setEnabledCategories = useUiStore((s) => s.setEnabledCategories);
@@ -72,9 +72,9 @@ export function CategoryFilter() {
               <img src={assetUrl(c.icon)} alt="" />
               <span className={styles.name}>{c.name}</span>
               <span className={styles.counts}>
-                {PLAYER_IDS.map((p) => (
+                {visiblePlayers.map((p) => (
                   <span key={p} style={{ color: `var(--${p})` }}>
-                    {c.found[p]}
+                    {c.found[p] ?? 0}
                   </span>
                 ))}
                 <span className={styles.muted}>/ {c.total}</span>

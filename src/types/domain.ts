@@ -1,4 +1,4 @@
-export type PlayerId = 'p1' | 'p2';
+export type PlayerId = 'p1' | 'p2' | 'p3' | 'p4' | 'p5' | 'p6';
 
 export type LatLng = [lat: number, lng: number];
 
@@ -34,6 +34,7 @@ export interface PinsData {
 // --- Session and progress --------------------------------------------------------
 
 export interface PlayerProfile {
+  id: PlayerId;
   /** Fallback name, shown until the player picks a character name. */
   name: string;
   color: string;
@@ -41,7 +42,8 @@ export interface PlayerProfile {
 
 export interface Session {
   me: PlayerId;
-  players: Record<PlayerId, PlayerProfile>;
+  /** Configured player slots (those with a password), in slot order. */
+  players: PlayerProfile[];
   tileUrl: string;
 }
 

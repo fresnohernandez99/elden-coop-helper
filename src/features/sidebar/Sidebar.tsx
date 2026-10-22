@@ -8,8 +8,7 @@ import { useUiStore } from '@/features/ui/uiStore';
 import { BackupPanel } from './BackupPanel';
 import { CategoryFilter } from './CategoryFilter';
 import { MapTabs } from './MapTabs';
-import { NextDestinationPanel } from './NextDestinationPanel';
-import { ProgressPanel } from './ProgressPanel';
+import { PlayersPanel } from './PlayersPanel';
 import { SearchPanel } from './SearchPanel';
 import styles from './Sidebar.module.css';
 
@@ -46,8 +45,7 @@ export function Sidebar() {
           </button>
         </header>
 
-        <ProgressPanel />
-        <NextDestinationPanel />
+        <PlayersPanel />
         <MapTabs />
         <SearchPanel />
         <CategoryFilter />

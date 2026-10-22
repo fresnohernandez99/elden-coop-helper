@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import pinsData from '../../public/data/pins.json';
-import type { PlayerProgress } from '@/types/domain';
+import type { PlayerId, PlayerProgress } from '@/types/domain';
 import { ByteReader, ByteWriter, DecodeError } from './binary';
 import { createSyncCatalog } from './catalog';
 import { decodeSyncRequest, decodeSyncResponse, encodeSyncRequest, encodeSyncResponse } from './protocol';
@@ -97,19 +97,33 @@ describe('snapshot', () => {
 
 describe('protocol', () => {
   it('keeps an idle poll tiny', () => {
-    const request = { rev: Date.now(), knownOtherRev: Date.now(), snapshot: null };
+    const request = { epoch: 0xdeadbeef, knownSeq: 42, rev: Date.now(), snapshot: null };
     const bytes = encodeSyncRequest(request);
     expect(decodeSyncRequest(bytes)).toEqual(request);
-    expect(bytes.length).toBeLessThanOrEqual(14);
+    expect(bytes.length).toBeLessThanOrEqual(16);
+
+    const response = { epoch: 0xdeadbeef, seq: 42, storedRev: Date.now(), online: ['p1', 'p3'] as const, snapshots: [] };
+    const responseBytes = encodeSyncResponse({ ...response, online: [...response.online] });
+    expect(responseBytes.length).toBeLessThanOrEqual(16);
   });
 
-  it('round-trips a response with a snapshot', () => {
-    const otherSnapshot = encodeSnapshot(progress(allIds.slice(0, 3)), catalog);
-    const response = { storedRev: 5, otherRev: 9, otherSnapshot };
+  it('round-trips a response with several players', () => {
+    const snapshots = (['p2', 'p5'] as const).map((player, i) => ({
+      player,
+      rev: 1000 + i,
+      snapshot: encodeSnapshot(progress(allIds.slice(i, i + 3), null, `Player ${player}`), catalog),
+    }));
+    const response = { epoch: 7, seq: 9, storedRev: 5, online: ['p1', 'p2', 'p5', 'p6'] as PlayerId[], snapshots };
     expect(decodeSyncResponse(encodeSyncResponse(response))).toEqual(response);
   });
 
+  it('rejects unknown player indices', () => {
+    const bytes = encodeSyncResponse({ epoch: 1, seq: 1, storedRev: 0, online: [], snapshots: [] });
+    const tampered = new Uint8Array([...bytes.slice(0, -1), 1, 9, 1, 0]);
+    expect(() => decodeSyncResponse(tampered)).toThrow(DecodeError);
+  });
+
   it('rejects another protocol version', () => {
-    expect(() => decodeSyncRequest(new Uint8Array([99, 0, 0, 0]))).toThrow(DecodeError);
+    expect(() => decodeSyncRequest(new Uint8Array([99, 0, 0, 0, 0, 0, 0, 0]))).toThrow(DecodeError);
   });
 });

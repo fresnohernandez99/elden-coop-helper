@@ -1,6 +1,6 @@
 # Elden Co-op Map
 
-Interactive Elden Ring map for two players. Each player marks what they find, sees the other player's progress, and sets a next destination on the map. Changes sync within a few seconds.
+Interactive Elden Ring map for co-op groups of up to six players. Each player marks what they find, sees the progress and next destination of everyone online, and sets their own next destination on the map. Changes sync within a few seconds.
 
 Built with **Next.js 16** (App Router), React 19, TypeScript, Leaflet (react-leaflet) and zustand. Pages and API live in a single project.
 
@@ -18,13 +18,13 @@ The screenshots use demo data: two players with some Limgrave pins found and a n
 
 ```sh
 npm install
-cp .env.example .env    # set both passwords
+cp .env.example .env    # set one password per player (2 to 6)
 npm run dev             # http://localhost:3000
 ```
 
-Open `http://localhost:3000`, enter a **character name** (any name, it can change on every login) and your **password**. The password decides whether you are player 1 or player 2.
+Open `http://localhost:3000`, enter a **character name** (any name, it can change on every login) and your **password**. The password decides which player slot you are.
 
-To let the other player join from their machine, run `npm run dev -- -H 0.0.0.0` and share `http://<your-ip>:3000`.
+To let other players join from their machines, run `npm run dev -- -H 0.0.0.0` and share `http://<your-ip>:3000`.
 
 | Script | What it does |
 | --- | --- |
@@ -38,7 +38,7 @@ To let the other player join from their machine, run `npm run dev -- -H 0.0.0.0`
 
 | Variable | Purpose |
 | --- | --- |
-| `PLAYER1_PASSWORD`, `PLAYER2_PASSWORD` | Password of each player slot. Must be different |
+| `PLAYER1_PASSWORD` … `PLAYER6_PASSWORD` | Password of each player slot. Only slots with a password exist; all must be different |
 | `SESSION_SECRET` | Optional extra secret for signing session cookies. Changing it logs everyone out |
 | `TILE_URL` | Optional tile URL template (`{map}`, `{z}`, `{x}`, `{y}`). Defaults to `/tiles/{map}/{z}_{x}_{y}.jpg` |
 
@@ -52,19 +52,23 @@ On screens up to 800px wide the map takes the whole screen. Every action lives i
 
 - `/` is the login page. `/map` is the map and requires a session. Unknown routes return 404.
 - `POST /api/login` checks the password (constant-time comparison) and sets an **httpOnly, signed session cookie** valid for 30 days. After 10 failed attempts from the same IP, login is blocked for 15 minutes.
-- The character name is never sent to the login endpoint. It is stored in the browser and shared with the other player inside the sync snapshot.
+- The character name is never sent to the login endpoint. It is stored in the browser and shared with the other players inside the sync snapshot.
 - "switch character" in the sidebar logs out, so you can log in again with another name. Your progress stays.
-- The cookie is signed with a key derived from both passwords (plus `SESSION_SECRET`), so changing a password invalidates every session.
+- The cookie is signed with a key derived from every password (plus `SESSION_SECRET`), so changing a password invalidates every session.
+
+## Players panel
+
+The **Players** section shows one card per player with their progress (total and current map) and their next destination. Only you and the players who are **online** are shown: a player counts as online while their app is open and syncing (seen within the last 20 seconds). Pin badges, popups, category counts and map flags follow the same rule. The progress of players who go offline stays cached in your browser and reappears when they come back.
 
 ## Where data lives (local-first)
 
 - **Your progress lives in your browser** (`localStorage`). It is the only original copy and only you change it.
-- **The server only relays.** It keeps each player's latest snapshot in memory so the other player can see it. No database, no disk.
+- **The server only relays.** It keeps each player's latest snapshot in memory so the others can see it, and tracks who is online. No database, no disk.
 - If the server loses that memory (restart, deploy, another instance on Vercel), your browser notices on the next poll and sends your data again.
-- **The other player's progress is cached** in your browser, so you still see it while they are offline.
+- **Other players' progress is cached** in your browser, so it is still there when they come back online.
 - To avoid losing data when switching browsers or clearing site data, use **Backup → Export / Import** (JSON file). Importing merges the backup's pins with the ones you already have.
 
-On Vercel, each request may hit a different instance. When both players are online they sync within seconds; if the other player is offline you see their last cached copy.
+On Vercel, each request may hit a different instance, so presence and relayed snapshots are best effort. Everything recovers on its own as soon as players keep polling.
 
 ## Sync format
 
@@ -73,11 +77,12 @@ A single route, `POST /api/sync`, with binary messages (`application/octet-strea
 - Each pin is identified by its position in the sorted catalog. Found pins travel as a **bitset** (1874 pins = 235 bytes at most) or as a **delta list** when there are few; the shorter one is picked automatically.
 - Coordinates take 2 bytes each, integers are varints, and the character name and note are UTF-8.
 - Every snapshot carries a hash of the catalog to detect different versions of `pins.json`.
-- **An idle poll is 9 bytes each way.** Your snapshot is only sent when it changed or when the server does not have it.
+- The server numbers stored snapshots with a sequence; each poll asks only for what changed since the last sequence it saw, plus a 1-byte bitmask of who is online. A server epoch tells clients when sequences started over.
+- **An idle poll is about 13 bytes up and 14 down**, whatever the number of players. Your snapshot is only sent when it changed or when the server does not have it.
 
 | Message | Measured size |
 | --- | --- |
-| Idle poll | 9 B up / 9 B down |
+| Idle poll (measured with 3 players) | 13 B up / 14 B down |
 | A change (1 pin + destination with a note) | ~45 B |
 | Every pin found | ~245 B |
 
@@ -114,7 +119,7 @@ src/
 │   ├── loginRateLimit.ts         failed login attempts per IP
 │   ├── http.ts                   withPlayer(), HTTP errors, body readers
 │   ├── imageProxy.ts             Game8 image proxy with immutable caching
-│   ├── relay.ts                  latest snapshot of each player, in memory
+│   ├── relay.ts                  latest snapshots, sequences and presence, in memory
 │   └── syncCatalog.ts            pin catalog used to validate snapshots
 ├── sync/                         binary format shared by client and server
 │   ├── binary.ts                 ByteWriter / ByteReader (varint, u16, u32…)
@@ -125,7 +130,7 @@ src/
 ├── features/                     frontend, by feature
 │   ├── auth/                     login form
 │   ├── player/                   player app shell (client only)
-│   ├── coop/                     progress: store, localStorage, sync engine, backup, names
+│   ├── coop/                     progress: store, localStorage, sync engine, presence, backup, names
 │   ├── map/                      map, markers, popups, "pick on map" mode
 │   ├── sidebar/                  sidebar panels
 │   ├── pins/                     pin catalog and filters

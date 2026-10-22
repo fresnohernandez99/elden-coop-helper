@@ -1,9 +1,8 @@
 import { useMap } from 'react-leaflet';
-import { PLAYER_IDS } from '@/config/constants';
 import { useCoopStore } from '@/features/coop/coopStore';
 import { nextDestinationFromPin } from '@/features/coop/nextDestination';
 import { usePlayerLabel } from '@/features/coop/playerNames';
-import { parseFoundByKey, useFoundByKey, useMe } from '@/features/coop/selectors';
+import { parseFoundByKey, useFoundByKey, useMe, useVisiblePlayers } from '@/features/coop/selectors';
 import { useUiStore } from '@/features/ui/uiStore';
 import { Button } from '@/shared/ui/Button';
 import { PlayerDot } from '@/shared/ui/PlayerDot';
@@ -15,6 +14,7 @@ export function PinPopup({ pin }: { pin: Pin }) {
   const map = useMap();
   const me = useMe();
   const playerLabel = usePlayerLabel();
+  const players = useVisiblePlayers();
   const foundBy = parseFoundByKey(useFoundByKey(pin.id));
   const toggleFound = useCoopStore((s) => s.toggleFound);
   const setNext = useCoopStore((s) => s.setNext);
@@ -38,7 +38,7 @@ export function PinPopup({ pin }: { pin: Pin }) {
       {pin.description && <p>{pin.description}</p>}
 
       <ul className={styles.who}>
-        {PLAYER_IDS.map((p) => (
+        {players.map((p) => (
           <li key={p}>
             <PlayerDot player={p} />
             {playerLabel(p)}: {foundBy.includes(p) ? <b>✓ found</b> : 'pending'}

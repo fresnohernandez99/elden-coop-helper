@@ -1,33 +1,32 @@
-import { PLAYER_IDS } from '@/config/constants';
 import { binary, readBinaryBody, withPlayer } from '@/server/http';
 import { relay } from '@/server/relay';
 import { syncCatalog } from '@/server/syncCatalog';
-import { decodeSyncRequest, encodeSyncResponse, MAX_SYNC_MESSAGE_BYTES } from '@/sync/protocol';
+import { decodeSyncRequest, encodeSyncResponse, MAX_SYNC_REQUEST_BYTES } from '@/sync/protocol';
 import { decodeSnapshot } from '@/sync/snapshot';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * POST /api/sync — binary exchange (see src/sync/protocol.ts).
- * Stores the player's snapshot if sent and returns the other player's if it is newer.
+ * Stores the player's snapshot if sent, marks them online, and returns who is
+ * online plus every other player's snapshot stored since the client's last sync.
  */
 export const POST = withPlayer(async (request, me) => {
-  const message = decodeSyncRequest(await readBinaryBody(request, MAX_SYNC_MESSAGE_BYTES));
+  const message = decodeSyncRequest(await readBinaryBody(request, MAX_SYNC_REQUEST_BYTES));
 
   if (message.snapshot) {
     decodeSnapshot(message.snapshot, syncCatalog); // validate before relaying it
-    relay.set(me, { rev: message.rev, snapshot: message.snapshot.slice() });
+    relay.store(me, message.rev, message.snapshot.slice());
   }
-
-  const other = PLAYER_IDS.find((p) => p !== me)!;
-  const mine = relay.get(me);
-  const theirs = relay.get(other);
+  relay.markSeen(me);
 
   return binary(
     encodeSyncResponse({
-      storedRev: mine?.rev ?? 0,
-      otherRev: theirs?.rev ?? 0,
-      otherSnapshot: theirs && theirs.rev > message.knownOtherRev ? theirs.snapshot : null,
+      epoch: relay.epoch,
+      seq: relay.seq,
+      storedRev: relay.storedRev(me),
+      online: relay.online(),
+      snapshots: relay.changesFor(me, message.epoch, message.knownSeq),
     }),
   );
 });

@@ -9,12 +9,11 @@ export function AppLayout() {
   const { me, players } = useSession();
   useCoopSync();
 
-  // Player colors come from the server and are used as CSS variables.
-  const playerColors = {
-    '--p1': players.p1.color,
-    '--p2': players.p2.color,
-    '--me': players[me].color,
-  } as CSSProperties;
+  // Player colors come from the server and are used as CSS variables (--p1 … --p6, --me).
+  const playerColors = Object.fromEntries([
+    ...players.map((p) => [`--${p.id}`, p.color]),
+    ['--me', players.find((p) => p.id === me)?.color],
+  ]) as CSSProperties;
 
   return (
     <div className={styles.layout} style={playerColors}>

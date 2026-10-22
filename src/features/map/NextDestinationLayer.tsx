@@ -1,9 +1,8 @@
 import { useMemo } from 'react';
 import { Marker, Popup, useMap } from 'react-leaflet';
-import { PLAYER_IDS } from '@/config/constants';
 import { useCoopStore } from '@/features/coop/coopStore';
 import { usePlayerLabel, usePlayerNames } from '@/features/coop/playerNames';
-import { nextDestinationTitle, useNextDestination } from '@/features/coop/selectors';
+import { nextDestinationTitle, useNextDestination, useVisiblePlayers } from '@/features/coop/selectors';
 import { usePins } from '@/features/pins/PinsContext';
 import { useSession } from '@/features/session/SessionContext';
 import { useUiStore } from '@/features/ui/uiStore';
@@ -13,11 +12,12 @@ import { flagIcon } from './mapIcons';
 import styles from './Popup.module.css';
 import { popupSize } from './popupSize';
 
-/** Flags with each player's next destination on the current map. */
+/** Flags with the next destination of you and every online player on the current map. */
 export function NextDestinationLayer() {
+  const players = useVisiblePlayers();
   return (
     <>
-      {PLAYER_IDS.map((p) => (
+      {players.map((p) => (
         <NextDestinationMarker key={p} player={p} />
       ))}
     </>

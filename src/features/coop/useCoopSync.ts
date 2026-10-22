@@ -1,5 +1,5 @@
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { syncApi } from '@/api/syncApi';
 import { usePins } from '@/features/pins/PinsContext';
 import { useSession } from '@/features/session/SessionContext';
@@ -10,14 +10,22 @@ import { startSyncEngine } from './syncEngine';
 /** Syncs with the server and with other tabs while the app is mounted. */
 export function useCoopSync() {
   const router = useRouter();
-  const { me } = useSession();
+  const session = useSession();
   const { syncCatalog } = usePins();
+  const players = useMemo(() => session.players.map((p) => p.id), [session.players]);
 
   useEffect(
-    // Expired session: back to the login page.
-    () => startSyncEngine(syncApi, syncCatalog, { onUnauthorized: () => router.replace('/') }),
-    [syncCatalog, router],
+    () =>
+      startSyncEngine(syncApi, syncCatalog, {
+        players,
+        // Expired session: back to the login page.
+        onUnauthorized: () => router.replace('/'),
+      }),
+    [syncCatalog, players, router],
   );
 
-  useEffect(() => localProgress.subscribeOwn(me, (progress) => useCoopStore.getState().replaceOwn(progress)), [me]);
+  useEffect(
+    () => localProgress.subscribeOwn(session.me, (progress) => useCoopStore.getState().replaceOwn(progress)),
+    [session.me],
+  );
 }

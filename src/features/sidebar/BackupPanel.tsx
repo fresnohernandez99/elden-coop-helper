@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import { downloadBackup, readBackup } from '@/features/coop/backup';
-import { useCoopStore } from '@/features/coop/coopStore';
+import { ownProgress, useCoopStore } from '@/features/coop/coopStore';
 import { usePlayerNames } from '@/features/coop/playerNames';
 import { showToast } from '@/features/notifications/toastStore';
 import { useSession } from '@/features/session/SessionContext';
@@ -15,7 +15,7 @@ export function BackupPanel() {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const exportProgress = () => {
-    downloadBackup(useCoopStore.getState().players[me], names[me]);
+    downloadBackup(ownProgress(useCoopStore.getState()), names[me]);
   };
 
   const importProgress = async (file: File) => {

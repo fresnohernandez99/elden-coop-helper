@@ -1,4 +1,5 @@
 import { useCallback, useMemo } from 'react';
+import { PLAYER_IDS } from '@/config/constants';
 import { useSession } from '@/features/session/SessionContext';
 import type { PlayerId } from '@/types/domain';
 import { useCoopStore } from './coopStore';
@@ -6,9 +7,15 @@ import { useCoopStore } from './coopStore';
 /** Character name of each player, falling back to "Player N" until they pick one. */
 export function usePlayerNames(): Record<PlayerId, string> {
   const { players } = useSession();
-  const p1 = useCoopStore((s) => s.players.p1.name);
-  const p2 = useCoopStore((s) => s.players.p2.name);
-  return useMemo(() => ({ p1: p1 || players.p1.name, p2: p2 || players.p2.name }), [p1, p2, players]);
+  // Joined into one string so the selector only changes when a name changes.
+  const key = useCoopStore((s) => PLAYER_IDS.map((id) => s.players[id]?.name ?? '').join('\u0000'));
+
+  return useMemo(() => {
+    const names = key.split('\u0000');
+    return Object.fromEntries(
+      PLAYER_IDS.map((id, i) => [id, names[i] || players.find((p) => p.id === id)?.name || `Player ${i + 1}`]),
+    ) as Record<PlayerId, string>;
+  }, [key, players]);
 }
 
 /** Player name, with " (you)" for the current player. */
