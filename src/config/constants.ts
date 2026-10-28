@@ -6,6 +6,9 @@ import type { PlayerId } from '@/types/domain';
 export const PLAYER_IDS: readonly PlayerId[] = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'];
 export const MAX_PLAYERS = PLAYER_IDS.length;
 
+/** Spectators watching at the same time (they can see everything but change nothing). */
+export const MAX_SPECTATORS = 20;
+
 /** A player counts as online if they synced within this window (~6 polls). */
 export const ONLINE_WINDOW_MS = 20_000;
 

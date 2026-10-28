@@ -12,6 +12,8 @@ import styles from './LoginForm.module.css';
  * Login with a character name and a password. The password picks the player
  * slot; the name is free and can change on every login (it is the character
  * being played), so it is only stored locally and shared through sync.
+ *
+ * "Watch as a spectator" needs no name or password: it opens the map read-only.
  */
 export function LoginForm() {
   const router = useRouter();
@@ -19,6 +21,18 @@ export function LoginForm() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  async function watch() {
+    setSubmitting(true);
+    setError(null);
+    try {
+      await authApi.watch();
+      router.replace('/map');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not enter as a spectator');
+      setSubmitting(false);
+    }
+  }
 
   async function submit(event: FormEvent) {
     event.preventDefault();
@@ -78,6 +92,10 @@ export function LoginForm() {
         <Button type="submit" variant="primary" disabled={submitting}>
           {submitting ? 'Entering…' : 'Enter'}
         </Button>
+
+        <button type="button" className={styles.switchMode} disabled={submitting} onClick={() => void watch()}>
+          Watch as a spectator (read-only)
+        </button>
       </form>
     </main>
   );

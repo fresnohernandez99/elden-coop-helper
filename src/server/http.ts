@@ -2,9 +2,8 @@ import 'server-only';
 import { type NextRequest, NextResponse } from 'next/server';
 import { DecodeError } from '@/sync/binary';
 import { CatalogMismatchError } from '@/sync/snapshot';
-import type { PlayerId } from '@/types/domain';
 import { ConfigError } from './config';
-import { playerFromSessionToken, SESSION_COOKIE } from './session';
+import { SESSION_COOKIE, type Viewer, viewerFromSessionToken } from './session';
 
 /** Error with an HTTP status, returned to the client as { error }. */
 export class HttpError extends Error {
@@ -34,15 +33,15 @@ export function errorResponse(error: unknown): Response {
   return json({ error: 'Internal error' }, 500);
 }
 
-type PlayerHandler = (request: NextRequest, me: PlayerId) => Promise<Response>;
+type ViewerHandler = (request: NextRequest, viewer: Viewer) => Promise<Response>;
 
-/** Wraps a route handler: requires a session cookie and turns errors into JSON. */
-export function withPlayer(handler: PlayerHandler) {
+/** Wraps a route handler: requires a session cookie (player or spectator) and turns errors into JSON. */
+export function withViewer(handler: ViewerHandler) {
   return async (request: NextRequest): Promise<Response> => {
     try {
-      const me = playerFromSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
-      if (!me) throw new HttpError(401, 'Not logged in');
-      return await handler(request, me);
+      const viewer = viewerFromSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
+      if (!viewer) throw new HttpError(401, 'Not logged in');
+      return await handler(request, viewer);
     } catch (error) {
       return errorResponse(error);
     }

@@ -2,7 +2,15 @@ import { useMemo } from 'react';
 import { NOTE_MAX_LENGTH } from '@/config/constants';
 import { useCoopStore } from '@/features/coop/coopStore';
 import { usePlayerLabel } from '@/features/coop/playerNames';
-import { countFound, nextDestinationTitle, useFoundMap, useNextDestination, useVisiblePlayers } from '@/features/coop/selectors';
+import {
+  countFound,
+  nextDestinationTitle,
+  useFoundMap,
+  useIsOnline,
+  useNextDestination,
+  useOnlineCount,
+  useVisiblePlayers,
+} from '@/features/coop/selectors';
 import { usePins } from '@/features/pins/PinsContext';
 import { useSession } from '@/features/session/SessionContext';
 import { useUiStore } from '@/features/ui/uiStore';
@@ -12,20 +20,26 @@ import { Section } from '@/shared/ui/Section';
 import type { Pin, PlayerId } from '@/types/domain';
 import styles from './PlayersPanel.module.css';
 
-/** You and every online player: progress and next destination in one card each. */
+/**
+ * You and every player whose progress was received: progress and next
+ * destination in one card each. Offline players keep their last known data.
+ */
 export function PlayersPanel() {
+  const { me } = useSession();
   const { pins } = usePins();
   const currentMap = useUiStore((s) => s.currentMap);
   const players = useVisiblePlayers();
+  const onlineCount = useOnlineCount();
   const pinsOnMap = useMemo(() => pins.filter((pin) => pin.area === currentMap), [pins, currentMap]);
+  const others = players.filter((p) => p !== me);
 
   return (
-    <Section title="Players" actions={<small className={styles.muted}>{players.length} online</small>}>
+    <Section title="Players" actions={<small className={styles.muted}>{onlineCount} online</small>}>
       {players.map((p) => (
         <PlayerCard key={p} player={p} pins={pins} pinsOnMap={pinsOnMap} mapTitle={currentMap ?? ''} />
       ))}
-      {players.length === 1 && <p className={styles.empty}>No other players online</p>}
-      <NextDestinationForm />
+      {others.length === 0 && <p className={styles.empty}>No progress from {me ? 'other ' : ''}players yet</p>}
+      {me && <NextDestinationForm />}
     </Section>
   );
 }
@@ -45,6 +59,7 @@ function PlayerCard({ player, pins, pinsOnMap, mapTitle }: PlayerCardProps) {
   const next = useNextDestination(player);
   const clearNext = useCoopStore((s) => s.clearNext);
   const focusOn = useUiStore((s) => s.focusOn);
+  const online = useIsOnline(player);
 
   const total = useMemo(() => countFound(pins, found), [pins, found]);
   const onMap = useMemo(() => countFound(pinsOnMap, found), [pinsOnMap, found]);
@@ -56,6 +71,7 @@ function PlayerCard({ player, pins, pinsOnMap, mapTitle }: PlayerCardProps) {
         <strong>
           <PlayerDot player={player} />
           {playerLabel(player)}
+          {!online && <small className={styles.muted}> · offline</small>}
         </strong>
         <span className={styles.count}>
           {total} / {pins.length}

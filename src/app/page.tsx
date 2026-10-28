@@ -2,7 +2,7 @@ import { redirect } from 'next/navigation';
 import { LoginForm } from '@/features/auth/LoginForm';
 import { StatusScreen } from '@/features/player/StatusScreen';
 import { ConfigError } from '@/server/config';
-import { getSessionPlayer } from '@/server/session';
+import { getSessionViewer } from '@/server/session';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export default async function LoginPage() {
   let loggedIn: boolean;
   try {
-    loggedIn = (await getSessionPlayer()) !== null;
+    loggedIn = (await getSessionViewer()) !== null;
   } catch (error) {
     if (error instanceof ConfigError) return <StatusScreen>Incomplete configuration: {error.message}</StatusScreen>;
     throw error;

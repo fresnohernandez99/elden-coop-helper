@@ -9,10 +9,21 @@ export const isFoundBy = (players: PlayersById, player: PlayerId, pinId: string)
 
 const splitIds = (key: string) => (key ? (key.split(',') as PlayerId[]) : []);
 
-/** Players shown in the UI: you first, then whoever is online. */
+type VisibleState = Pick<ReturnType<typeof useCoopStore.getState>, 'me' | 'players'>;
+
+/**
+ * You first (unless spectating), then every other player whose progress was
+ * ever received, online or not: their last data stays until a newer one arrives.
+ */
+function visibleIds({ me, players }: VisibleState): PlayerId[] {
+  const others = (Object.keys(players) as PlayerId[]).filter((p) => p !== me && (players[p]?.rev ?? 0) > 0);
+  return me ? [me, ...others] : others;
+}
+
+/** Players shown in the UI (see visibleIds), in slot order after you. */
 export function useVisiblePlayers(): PlayerId[] {
   // A string key keeps the selector stable; the array is rebuilt only when it changes.
-  const key = useCoopStore((s) => [s.me, ...s.online].join(','));
+  const key = useCoopStore((s) => visibleIds(s).join(','));
   return useMemo(() => splitIds(key), [key]);
 }
 
@@ -21,12 +32,17 @@ export function useVisiblePlayers(): PlayerId[] {
  * Returning a string avoids re-rendering the marker when nothing changed.
  */
 export function useFoundByKey(pinId: string): string {
-  return useCoopStore((s) => [s.me, ...s.online].filter((p) => isFoundBy(s.players, p, pinId)).join(','));
+  return useCoopStore((s) => visibleIds(s).filter((p) => isFoundBy(s.players, p, pinId)).join(','));
 }
 
 export const parseFoundByKey = splitIds;
 
+/** Your player slot, or null when spectating. */
 export const useMe = () => useCoopStore((s) => s.me);
+
+export const useIsOnline = (player: PlayerId) => useCoopStore((s) => s.me === player || s.online.includes(player));
+
+export const useOnlineCount = () => useCoopStore((s) => s.online.length + (s.me ? 1 : 0));
 
 const NOTHING_FOUND: Record<string, number> = {};
 

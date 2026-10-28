@@ -41,7 +41,8 @@ export interface PlayerProfile {
 }
 
 export interface Session {
-  me: PlayerId;
+  /** Your player slot, or null when watching as a spectator (read-only). */
+  me: PlayerId | null;
   /** Configured player slots (those with a password), in slot order. */
   players: PlayerProfile[];
   tileUrl: string;

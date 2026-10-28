@@ -24,8 +24,9 @@ export function useCoopSync() {
     [syncCatalog, players, router],
   );
 
-  useEffect(
-    () => localProgress.subscribeOwn(session.me, (progress) => useCoopStore.getState().replaceOwn(progress)),
-    [session.me],
-  );
+  useEffect(() => {
+    const { me } = session;
+    if (!me) return; // spectators have no own progress
+    return localProgress.subscribeOwn(me, (progress) => useCoopStore.getState().replaceOwn(progress));
+  }, [session]);
 }

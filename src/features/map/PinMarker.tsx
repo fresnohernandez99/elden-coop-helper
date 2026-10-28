@@ -16,7 +16,7 @@ export const PinMarker = memo(function PinMarker({ pin }: { pin: Pin }) {
   const foundByKey = useFoundByKey(pin.id);
   const icon = useMemo(() => {
     const foundBy = parseFoundByKey(foundByKey);
-    return pinIcon(pin.icon, foundBy, foundBy.includes(me));
+    return pinIcon(pin.icon, foundBy, me !== null && foundBy.includes(me));
   }, [pin.icon, foundByKey, me]);
 
   const registerMarker = useCallback((marker: LeafletMarker | null) => markerRegistry.register(pin.id, marker), [pin.id]);

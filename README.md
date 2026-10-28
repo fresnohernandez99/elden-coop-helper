@@ -1,6 +1,6 @@
 # Elden Co-op Map
 
-Interactive Elden Ring map for co-op groups of up to six players. Each player marks what they find, sees the progress and next destination of everyone online, and sets their own next destination on the map. Changes sync within a few seconds.
+Interactive Elden Ring map for co-op groups of up to six players. Each player marks what they find, sees the progress and next destination of everyone, and sets their own next destination on the map. Changes sync within a few seconds. Up to 20 spectators can watch without marking anything.
 
 Built with **Next.js 16** (App Router), React 19, TypeScript, Leaflet (react-leaflet) and zustand. Pages and API live in a single project.
 
@@ -53,22 +53,25 @@ On screens up to 800px wide the map takes the whole screen. Every action lives i
 - `/` is the login page. `/map` is the map and requires a session. Unknown routes return 404.
 - `POST /api/login` checks the password (constant-time comparison) and sets an **httpOnly, signed session cookie** valid for 30 days. After 10 failed attempts from the same IP, login is blocked for 15 minutes.
 - The character name is never sent to the login endpoint. It is stored in the browser and shared with the other players inside the sync snapshot.
+- **Spectators** press "Watch as a spectator" on the login page: no name, no password. Anyone with the link can watch. They see the map, every player's progress and next destinations, but cannot mark anything; the server rejects any snapshot they send. Up to 20 spectators can watch at once (a seat frees up 20 seconds after one leaves). On Vercel the limit is counted per server instance, so it is approximate.
 - "switch character" in the sidebar logs out, so you can log in again with another name. Your progress stays.
 - The cookie is signed with a key derived from every password (plus `SESSION_SECRET`), so changing a password invalidates every session.
 
 ## Players panel
 
-The **Players** section shows one card per player with their progress (total and current map) and their next destination. Only you and the players who are **online** are shown: a player counts as online while their app is open and syncing (seen within the last 20 seconds). Pin badges, popups, category counts and map flags follow the same rule. The progress of players who go offline stays cached in your browser and reappears when they come back.
+The **Players** section shows one card per player with their progress (total and current map) and their next destination: you, plus every player whose progress your browser has received. Pin badges, popups, category counts and map flags follow the same rule.
+
+A player's data is **only replaced by a newer snapshot of that player**, never cleared: it stays when they disconnect, and when a poll lands on a server instance that does not know them. Players who are not syncing right now (not seen within the last 20 seconds) are labeled "offline".
 
 ## Where data lives (local-first)
 
 - **Your progress lives in your browser** (`localStorage`). It is the only original copy and only you change it.
 - **The server only relays.** It keeps each player's latest snapshot in memory so the others can see it, and tracks who is online. No database, no disk.
 - If the server loses that memory (restart, deploy, another instance on Vercel), your browser notices on the next poll and sends your data again.
-- **Other players' progress is cached** in your browser, so it is still there when they come back online.
+- **Other players' progress is cached** in your browser, so it is still there after they disconnect or the server forgets it.
 - To avoid losing data when switching browsers or clearing site data, use **Backup → Export / Import** (JSON file). Importing merges the backup's pins with the ones you already have.
 
-On Vercel, each request may hit a different instance, so presence and relayed snapshots are best effort. Everything recovers on its own as soon as players keep polling.
+On Vercel, each request may hit a different instance, so presence and relayed snapshots are best effort. The client smooths this out: received progress is kept until a newer one arrives, and a player stays online until no instance has reported them for 20 seconds. A browser that never received a player's data (for example a new spectator) only sees it once a polled instance holds it, which happens as soon as that player syncs again.
 
 ## Sync format
 
@@ -117,7 +120,7 @@ src/
 │   ├── auth.ts                   password → player (constant-time)
 │   ├── session.ts                signed session cookie
 │   ├── loginRateLimit.ts         failed login attempts per IP
-│   ├── http.ts                   withPlayer(), HTTP errors, body readers
+│   ├── http.ts                   withViewer(), HTTP errors, body readers
 │   ├── imageProxy.ts             Game8 image proxy with immutable caching
 │   ├── relay.ts                  latest snapshots, sequences and presence, in memory
 │   └── syncCatalog.ts            pin catalog used to validate snapshots
@@ -134,7 +137,7 @@ src/
 │   ├── map/                      map, markers, popups, "pick on map" mode
 │   ├── sidebar/                  sidebar panels
 │   ├── pins/                     pin catalog and filters
-│   ├── session/                  current player and profiles
+│   ├── session/                  current player (or spectator) and profiles
 │   ├── ui/                       UI state (map, filters, focus)
 │   └── notifications/            toasts
 ├── api/                          typed HTTP clients for the frontend
@@ -158,7 +161,7 @@ scripts/                          data generation
 
 **Extending it**
 
-- **A new endpoint:** create `src/app/api/<name>/route.ts` wrapped in `withPlayer(...)` and add a client in `src/api/`.
+- **A new endpoint:** create `src/app/api/<name>/route.ts` wrapped in `withViewer(...)` (players and spectators; check `viewer.kind` for write access) and add a client in `src/api/`.
 - **New synced data:** append it to `snapshot.ts`, bump `PROTOCOL_VERSION` in `protocol.ts`, and add a test to `sync.test.ts`.
 - **A new page:** add a route under `src/app/`.
 
@@ -166,11 +169,11 @@ scripts/                          data generation
 
 | Method | Route | Body / response |
 | --- | --- | --- |
-| POST | `/api/login` | `{ "password": "…" }` → `{ "player": "p1" }` + session cookie |
+| POST | `/api/login` | `{ "password": "…" }` → `{ "player": "p1" }`, or `{ "spectator": true }` (no password) → `{ "player": null }`; both set the session cookie |
 | POST | `/api/logout` | Clears the session cookie |
 | POST | `/api/sync` | Binary, see `src/sync/protocol.ts` and `src/sync/snapshot.ts` |
 
-Errors are JSON `{ error }`: 400 invalid message, 401 not logged in or wrong password, 409 catalog mismatch, 413 message too large, 429 too many login attempts.
+Errors are JSON `{ error }`: 400 invalid message, 401 not logged in or wrong password, 403 spectator tried to send progress, 409 catalog mismatch, 413 message too large, 429 too many login attempts, 503 spectator room full.
 
 ## Data
 

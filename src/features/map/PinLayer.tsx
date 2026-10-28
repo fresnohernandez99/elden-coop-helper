@@ -15,7 +15,7 @@ export function PinLayer() {
   const hideFound = useUiStore((s) => s.hideFound);
   const focusedPinId = useUiStore((s) => s.focus?.pinId);
   // Only depends on what I found when hiding found pins.
-  const hiddenIds = useCoopStore((s) => (hideFound ? s.players[s.me]?.found : undefined));
+  const hiddenIds = useCoopStore((s) => (hideFound && s.me ? s.players[s.me]?.found : undefined));
 
   const visiblePins = useMemo(() => {
     if (!currentMap) return [];

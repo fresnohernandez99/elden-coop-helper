@@ -57,8 +57,8 @@ function loadConfig(env: NodeJS.ProcessEnv): AppConfig {
 
 export const isConfiguredPlayer = (player: PlayerId) => getConfig().players.includes(player);
 
-/** What the client may know: no passwords. */
-export function sessionFor(me: PlayerId): Session {
+/** What the client may know: no passwords. `me` is null for spectators. */
+export function sessionFor(me: PlayerId | null): Session {
   const players: PlayerProfile[] = getConfig().players.map((id) => ({
     id,
     name: `Player ${PLAYER_IDS.indexOf(id) + 1}`,

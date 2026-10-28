@@ -62,3 +62,13 @@
   opacity: 0.6;
   cursor: wait;
 }
+
+.card .switchMode {
+  justify-self: center;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font-size: 13px;
+  cursor: pointer;
+}

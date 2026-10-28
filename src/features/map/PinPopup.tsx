@@ -20,7 +20,7 @@ export function PinPopup({ pin }: { pin: Pin }) {
   const setNext = useCoopStore((s) => s.setNext);
   const note = useUiStore((s) => s.nextNote);
 
-  const foundByMe = foundBy.includes(me);
+  const foundByMe = me !== null && foundBy.includes(me);
   const next = nextDestinationFromPin(pin, note);
   const meta = [pin.category, pin.subtype, pin.region].filter(Boolean).join(' · ');
 
@@ -46,21 +46,23 @@ export function PinPopup({ pin }: { pin: Pin }) {
         ))}
       </ul>
 
-      <div className={styles.actions}>
-        <Button variant={foundByMe ? 'default' : 'primary'} onClick={() => toggleFound(pin.id)}>
-          {foundByMe ? 'Unmark' : 'Mark as found'}
-        </Button>
-        {next && (
-          <Button
-            onClick={() => {
-              setNext(next);
-              map.closePopup();
-            }}
-          >
-            Next destination
+      {me && (
+        <div className={styles.actions}>
+          <Button variant={foundByMe ? 'default' : 'primary'} onClick={() => toggleFound(pin.id)}>
+            {foundByMe ? 'Unmark' : 'Mark as found'}
           </Button>
-        )}
-      </div>
+          {next && (
+            <Button
+              onClick={() => {
+                setNext(next);
+                map.closePopup();
+              }}
+            >
+              Next destination
+            </Button>
+          )}
+        </div>
+      )}
 
       {pin.url && (
         <a href={pin.url} target="_blank" rel="noopener noreferrer">

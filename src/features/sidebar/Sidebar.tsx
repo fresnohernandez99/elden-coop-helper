@@ -37,7 +37,16 @@ export function Sidebar() {
           <div>
             <h1 className={styles.title}>Elden Co-op Map</h1>
             <p className={styles.subtitle}>
-              Playing as <strong style={{ color: 'var(--me)' }}>{names[me]}</strong> · <SwitchCharacterButton />
+              {me ? (
+                <>
+                  Playing as <strong style={{ color: 'var(--me)' }}>{names[me]}</strong> ·{' '}
+                  <LogoutButton label="switch character" />
+                </>
+              ) : (
+                <>
+                  Watching as <strong>spectator</strong> (read-only) · <LogoutButton label="leave" />
+                </>
+              )}
             </p>
           </div>
           <button type="button" className={styles.close} aria-label="Close panel" onClick={() => setOpen(false)}>
@@ -49,7 +58,7 @@ export function Sidebar() {
         <MapTabs />
         <SearchPanel />
         <CategoryFilter />
-        <BackupPanel />
+        {me && <BackupPanel me={me} />}
 
         <p className={styles.credit}>Data and maps: Game8 / FromSoftware. For personal use only.</p>
       </aside>
@@ -57,11 +66,11 @@ export function Sidebar() {
   );
 }
 
-/** Logs out so you can log in again with another character name. Progress stays. */
-function SwitchCharacterButton() {
+/** Logs out so you can log in again (another character name, or as a player). Progress stays. */
+function LogoutButton({ label }: { label: string }) {
   const router = useRouter();
 
-  const switchCharacter = async () => {
+  const logout = async () => {
     try {
       await authApi.logout();
       router.replace('/');
@@ -71,8 +80,8 @@ function SwitchCharacterButton() {
   };
 
   return (
-    <button type="button" className={styles.link} onClick={() => void switchCharacter()}>
-      switch character
+    <button type="button" className={styles.link} onClick={() => void logout()}>
+      {label}
     </button>
   );
 }

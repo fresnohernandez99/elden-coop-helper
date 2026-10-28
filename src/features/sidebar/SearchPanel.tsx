@@ -16,6 +16,7 @@ export function SearchPanel() {
   const setSearch = useUiStore((s) => s.setSearch);
   const hideFound = useUiStore((s) => s.hideFound);
   const setHideFound = useUiStore((s) => s.setHideFound);
+  const spectating = useMe() === null;
 
   return (
     <Section>
@@ -25,10 +26,12 @@ export function SearchPanel() {
         placeholder="Search (name, region, category)…"
         onChange={(e) => setSearch(e.target.value)}
       />
-      <label className={styles.check}>
-        <input type="checkbox" checked={hideFound} onChange={(e) => setHideFound(e.target.checked)} />
-        Hide what I already found
-      </label>
+      {!spectating && (
+        <label className={styles.check}>
+          <input type="checkbox" checked={hideFound} onChange={(e) => setHideFound(e.target.checked)} />
+          Hide what I already found
+        </label>
+      )}
       {isSearchActive(search) && <SearchResults query={search} />}
     </Section>
   );
@@ -55,7 +58,7 @@ function SearchResult({ pin }: { pin: Pin }) {
   const foundBy = parseFoundByKey(useFoundByKey(pin.id));
   const toggleFound = useCoopStore((s) => s.toggleFound);
   const focusPin = useUiStore((s) => s.focusPin);
-  const foundByMe = foundBy.includes(me);
+  const foundByMe = me !== null && foundBy.includes(me);
 
   const goToPin = () => {
     if (pin.latlng) focusPin(pin);
@@ -64,15 +67,17 @@ function SearchResult({ pin }: { pin: Pin }) {
 
   return (
     <li className={styles.item}>
-      <button
-        type="button"
-        className={`${styles.checkButton} ${foundByMe ? styles.checked : ''}`}
-        title={foundByMe ? 'Unmark' : 'Mark as found'}
-        aria-pressed={foundByMe}
-        onClick={() => toggleFound(pin.id)}
-      >
-        ✓
-      </button>
+      {me && (
+        <button
+          type="button"
+          className={`${styles.checkButton} ${foundByMe ? styles.checked : ''}`}
+          title={foundByMe ? 'Unmark' : 'Mark as found'}
+          aria-pressed={foundByMe}
+          onClick={() => toggleFound(pin.id)}
+        >
+          ✓
+        </button>
+      )}
       <button type="button" className={styles.result} onClick={goToPin}>
         <span>
           {pin.title}{' '}

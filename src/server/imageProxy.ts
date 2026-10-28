@@ -1,6 +1,6 @@
 import 'server-only';
 import type { NextRequest } from 'next/server';
-import { playerFromSessionToken, SESSION_COOKIE } from './session';
+import { SESSION_COOKIE, viewerFromSessionToken } from './session';
 
 /**
  * Proxies Game8 map images through our own origin.
@@ -8,7 +8,7 @@ import { playerFromSessionToken, SESSION_COOKIE } from './session';
  * Game8 serves them without Cache-Control, so browsers only cache them
  * heuristically. Returning them from here as `immutable` means each tile is
  * downloaded once and then served from the browser cache, even across visits.
- * Only logged-in players can use it, so it cannot be abused as an open proxy.
+ * Only logged-in players and spectators can use it, so it cannot be abused as an open proxy.
  */
 
 // Private: only this browser caches it (the response requires a session).
@@ -16,7 +16,7 @@ const CACHE_FOREVER = 'private, max-age=31536000, immutable';
 const CACHE_MISSING = 'private, max-age=3600';
 
 export async function proxyImage(request: NextRequest, upstreamUrl: string): Promise<Response> {
-  if (!playerFromSessionToken(request.cookies.get(SESSION_COOKIE)?.value)) {
+  if (!viewerFromSessionToken(request.cookies.get(SESSION_COOKIE)?.value)) {
     return new Response('Not logged in', { status: 401 });
   }
 

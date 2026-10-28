@@ -12,7 +12,7 @@ import { flagIcon } from './mapIcons';
 import styles from './Popup.module.css';
 import { popupSize } from './popupSize';
 
-/** Flags with the next destination of you and every online player on the current map. */
+/** Flags with the next destination of every visible player (see useVisiblePlayers) on the current map. */
 export function NextDestinationLayer() {
   const players = useVisiblePlayers();
   return (

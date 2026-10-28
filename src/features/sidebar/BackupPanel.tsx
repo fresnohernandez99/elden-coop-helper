@@ -3,14 +3,13 @@ import { downloadBackup, readBackup } from '@/features/coop/backup';
 import { ownProgress, useCoopStore } from '@/features/coop/coopStore';
 import { usePlayerNames } from '@/features/coop/playerNames';
 import { showToast } from '@/features/notifications/toastStore';
-import { useSession } from '@/features/session/SessionContext';
 import { Button } from '@/shared/ui/Button';
 import { Section } from '@/shared/ui/Section';
+import type { PlayerId } from '@/types/domain';
 import styles from './BackupPanel.module.css';
 
 /** Your progress lives in this browser: exporting it lets you back it up or move it to another device. */
-export function BackupPanel() {
-  const { me } = useSession();
+export function BackupPanel({ me }: { me: PlayerId }) {
   const names = usePlayerNames();
   const fileInput = useRef<HTMLInputElement>(null);
 
