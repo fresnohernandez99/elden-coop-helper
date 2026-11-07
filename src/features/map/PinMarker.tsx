@@ -33,6 +33,14 @@ export const PinMarker = memo(function PinMarker({ pin }: { pin: Pin }) {
         ui.setPlacing(false);
         useCoopStore.getState().setNext(next);
       },
+      // Double-clicking a pin sets it as the destination at any time.
+      dblclick: (e: LeafletMouseEvent) => {
+        const next = nextDestinationFromPin(pin, useUiStore.getState().nextNote);
+        if (!next || !useCoopStore.getState().me) return;
+        (e.target as LeafletMarker).closePopup(); // opened by the first click
+        useUiStore.getState().setPlacing(false);
+        useCoopStore.getState().setNext(next);
+      },
     }),
     [pin],
   );

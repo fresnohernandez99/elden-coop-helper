@@ -137,6 +137,7 @@ function NextDestinationForm() {
       <Button variant="primary" onClick={() => setPlacing(!placing)}>
         {placing ? 'Cancel' : 'Pick next destination on map'}
       </Button>
+      <small className={styles.muted}>Or double-click any point or pin on the map.</small>
     </div>
   );
 }
