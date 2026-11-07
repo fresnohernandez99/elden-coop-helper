@@ -12,6 +12,7 @@ import {
   useVisiblePlayers,
 } from '@/features/coop/selectors';
 import { usePins } from '@/features/pins/PinsContext';
+import { useEnabledCategories } from '@/features/pins/useEnabledCategories';
 import { useSession } from '@/features/session/SessionContext';
 import { useUiStore } from '@/features/ui/uiStore';
 import { Button } from '@/shared/ui/Button';
@@ -23,13 +24,16 @@ import styles from './PlayersPanel.module.css';
 /**
  * You and every player whose progress was received: progress and next
  * destination in one card each. Offline players keep their last known data.
+ * Progress only counts the categories that are shown on the map.
  */
 export function PlayersPanel() {
   const { me } = useSession();
-  const { pins } = usePins();
+  const { pins: allPins } = usePins();
+  const enabled = useEnabledCategories();
   const currentMap = useUiStore((s) => s.currentMap);
   const players = useVisiblePlayers();
   const onlineCount = useOnlineCount();
+  const pins = useMemo(() => allPins.filter((pin) => enabled.has(pin.category)), [allPins, enabled]);
   const pinsOnMap = useMemo(() => pins.filter((pin) => pin.area === currentMap), [pins, currentMap]);
   const others = players.filter((p) => p !== me);
 
@@ -63,7 +67,7 @@ function PlayerCard({ player, pins, pinsOnMap, mapTitle }: PlayerCardProps) {
 
   const total = useMemo(() => countFound(pins, found), [pins, found]);
   const onMap = useMemo(() => countFound(pinsOnMap, found), [pinsOnMap, found]);
-  const percent = pins.length ? (total / pins.length) * 100 : 0;
+  const percent = toPercent(total, pins.length);
 
   return (
     <article className={styles.card} style={{ borderColor: `var(--${player})` }}>
@@ -74,14 +78,14 @@ function PlayerCard({ player, pins, pinsOnMap, mapTitle }: PlayerCardProps) {
           {!online && <small className={styles.muted}> · offline</small>}
         </strong>
         <span className={styles.count}>
-          {total} / {pins.length}
+          {total} / {pins.length} <span className={styles.muted}>· {formatPercent(percent)}</span>
         </span>
       </header>
       <div className={styles.bar}>
         <span style={{ width: `${percent.toFixed(1)}%`, background: `var(--${player})` }} />
       </div>
       <small className={styles.muted}>
-        {mapTitle}: {onMap} / {pinsOnMap.length}
+        {mapTitle}: {onMap} / {pinsOnMap.length} · {formatPercent(toPercent(onMap, pinsOnMap.length))}
       </small>
 
       <div className={styles.destination}>
@@ -109,6 +113,11 @@ function PlayerCard({ player, pins, pinsOnMap, mapTitle }: PlayerCardProps) {
     </article>
   );
 }
+
+const toPercent = (part: number, whole: number) => (whole ? (part / whole) * 100 : 0);
+
+/** Rounded down, so 100% only shows once everything is found. */
+const formatPercent = (percent: number) => `${Math.floor(percent)}%`;
 
 function NextDestinationForm() {
   const note = useUiStore((s) => s.nextNote);

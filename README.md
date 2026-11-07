@@ -63,7 +63,9 @@ On screens up to 800px wide the map takes the whole screen. Every action lives i
 
 ## Players panel
 
-The **Players** section shows one card per player with their progress (total and current map) and their next destination: you, plus every player whose progress your browser has received. Pin badges, popups, category counts and map flags follow the same rule.
+The **Players** section shows one card per player with their progress (total and current map, with a percentage) and their next destination: you, plus every player whose progress your browser has received. Pin badges, popups, category counts and map flags follow the same rule.
+
+Progress only counts the categories checked under **Categories**: unchecking "Site of Grace", for example, takes them out of both the found count and the total.
 
 A player's data is **only replaced by a newer snapshot of that player**, never cleared: it stays when they disconnect, and when a poll lands on a server instance that does not know them. Players who are not syncing right now (not seen within the last 20 seconds) are labeled "offline".
 
