@@ -50,7 +50,7 @@ On screens up to 800px wide the map takes the whole screen. Every action lives i
 
 ## Overlay over the game
 
-`overlay/` holds a Windows desktop app that shows the map over Elden Ring with a keyboard shortcut (`Ctrl+Shift+M`), without touching the game process. See [overlay/README.md](overlay/README.md).
+`overlay/` holds a Windows desktop app that shows the map over Elden Ring with a keyboard shortcut (`\`), without touching the game process. See [overlay/README.md](overlay/README.md).
 
 ## Login and session
 

@@ -33,7 +33,7 @@ impl Default for Config {
     fn default() -> Self {
         Self {
             url: String::new(),
-            toggle_shortcut: "Ctrl+Shift+M".into(),
+            toggle_shortcut: "Backslash".into(),
             click_through_shortcut: "Ctrl+Shift+K".into(),
             opacity: 0.92,
         }

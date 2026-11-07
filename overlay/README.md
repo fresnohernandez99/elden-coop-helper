@@ -12,12 +12,12 @@ It is not a real in-game overlay: it never touches the game process, it is just 
 
 | Default shortcut | Action |
 | --- | --- |
-| `Ctrl+Shift+M` | Show / hide the map. Showing it gives it the keyboard; hiding it returns to the game |
+| `\` (`Backslash`, under Backspace on most keyboards) | Show / hide the map. Showing it gives it the keyboard; hiding it returns to the game |
 | `Ctrl+Shift+K` | Click-through: the map stays visible but clicks and keys go to the game |
 
 - Drag the window by the gold handle at its top edge and resize it from its edges. Position and size are remembered.
 - Opacity is set in Settings (30–100%).
-- Shortcuts use the format `Ctrl+Shift+M`, `Alt+F1`, `Ctrl+Alt+Digit1`, etc. If another app already took one, Settings says so.
+- Shortcuts use the format `Backslash`, `Ctrl+Shift+M`, `Alt+F1`, `Ctrl+Alt+Digit1`, etc. If another app already took one, Settings says so.
 - Settings are saved in `%APPDATA%\com.eldencoop.overlay\config.json`.
 
 ## Build
