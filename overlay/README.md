@@ -22,10 +22,7 @@ It is not a real in-game overlay: it never touches the game process, it is just 
 
 ## Build
 
-The installer is built on Windows by GitHub Actions (`.github/workflows/overlay.yml`), since Tauri does not cross-compile from macOS reliably:
-
-- **Actions → Overlay (Windows) → Run workflow**: download `elden-coop-overlay-setup` from the run.
-- **Tag `overlay-v1.0.0`** (`git tag overlay-v1.0.0 && git push origin overlay-v1.0.0`): also published as a release.
+The installer is built on Windows by GitHub Actions (`.github/workflows/overlay.yml`), since Tauri does not cross-compile from macOS reliably. Every push to `master` that changes `overlay/` (or the workflow) builds it and publishes it as a **pre-release** in the repo's Releases, tagged `overlay-v<version>-rc.<run number>`. The version comes from `src-tauri/tauri.conf.json`.
 
 The installer does not need admin rights. It uses WebView2, which ships with Windows 10 and 11.
 
