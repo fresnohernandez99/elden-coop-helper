@@ -48,6 +48,10 @@ Variables are only read on the server. None has the `NEXT_PUBLIC_` prefix, so th
 
 On screens up to 800px wide the map takes the whole screen. Every action lives in a drawer opened with the button in the top-left corner; tap outside it, press × or start "Pick on map" to close it. Zoom controls sit at the bottom right, touch targets are at least 40px, inputs use 16px text so iOS does not zoom in, and the layout respects the notch and home indicator (`viewport-fit=cover` + `env(safe-area-inset-*)`).
 
+## Overlay over the game
+
+`overlay/` holds a Windows desktop app that shows the map over Elden Ring with a keyboard shortcut (`Ctrl+Shift+M`), without touching the game process. See [overlay/README.md](overlay/README.md).
+
 ## Login and session
 
 - `/` is the login page. `/map` is the map and requires a session. Unknown routes return 404.

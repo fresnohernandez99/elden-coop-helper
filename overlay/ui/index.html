@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Elden Co-op Overlay</title>
+    <link rel="stylesheet" href="settings.css" />
+  </head>
+  <body>
+    <form id="form">
+      <h1>Elden Co-op Overlay</h1>
+
+      <label>
+        Map URL
+        <input id="url" type="url" placeholder="https://your-map.vercel.app" required />
+      </label>
+
+      <label>
+        Show / hide map
+        <input id="toggleShortcut" required />
+      </label>
+
+      <label>
+        Click-through on / off
+        <input id="clickThroughShortcut" required />
+        <small>The map stays visible but clicks go to the game.</small>
+      </label>
+
+      <label>
+        Opacity <output id="opacityValue"></output>
+        <input id="opacity" type="range" min="0.3" max="1" step="0.01" />
+      </label>
+
+      <p class="hint">
+        Set Elden Ring to <b>borderless windowed</b>: Windows does not draw other windows over exclusive
+        full screen. Drag the map by the gold handle at its top edge. Settings and quit are in the tray icon.
+      </p>
+
+      <p id="error" role="alert"></p>
+      <button type="submit">Save</button>
+    </form>
+    <script src="settings.js"></script>
+  </body>
+</html>

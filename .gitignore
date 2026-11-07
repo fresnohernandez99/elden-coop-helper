@@ -5,3 +5,5 @@ node_modules/
 next-env.d.ts
 *.tsbuildinfo
 public/map-tiles/
+overlay/src-tauri/target/
+overlay/src-tauri/gen/

@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "settings",
+  "description": "The local settings page reads and saves the overlay config.",
+  "windows": ["settings"],
+  "permissions": ["core:default", "allow-get-config", "allow-save-config"]
+}
