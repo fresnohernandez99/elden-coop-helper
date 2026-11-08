@@ -11,6 +11,8 @@ import { getConfig } from './config';
  * The subject is `p:<team id>:<slot>:<join id>` for a player or
  * `s:<team id>:<random id>` for a spectator. Without a cookie you play solo.
  *
+ * Syncing renews it (see `withViewer` in http.ts), at most once a day.
+ *
  * The join id changes when a player is kicked and someone else takes the slot,
  * so an old cookie stops working (see relay.ts for how that is checked).
  * Changing SESSION_SECRET logs everyone out.
@@ -22,7 +24,9 @@ export type Viewer =
   | { kind: 'spectator'; teamId: string; id: string };
 
 export const SESSION_COOKIE = 'ecm_session';
-const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+const SESSION_MAX_AGE_SECONDS = 90 * 24 * 60 * 60;
+/** A session in use is renewed once it is this old, so it only expires after 90 days without playing. */
+const SESSION_RENEW_AFTER_SECONDS = 24 * 60 * 60;
 const TEAM_ID = /^[0-9a-f]{24}$/;
 const TOKEN = /^[A-Za-z0-9_-]{8,32}$/;
 
@@ -61,17 +65,22 @@ export function createSessionToken(viewer: Viewer): string {
 }
 
 /** Returns the viewer of a valid, unexpired token, or null. */
-export function viewerFromSessionToken(token: string | undefined): Viewer | null {
+export const viewerFromSessionToken = (token: string | undefined): Viewer | null => readSessionToken(token)?.viewer ?? null;
+
+/** The viewer of a valid, unexpired token and whether it is old enough to be renewed. */
+export function readSessionToken(token: string | undefined): { viewer: Viewer; renew: boolean } | null {
   const [subject, expires, signature, ...extra] = token?.split('.') ?? [];
   if (!subject || !expires || !signature || extra.length > 0) return null;
   const viewer = viewerFor(subject);
   if (!viewer) return null;
-  if (parseInt(expires, 36) * 1000 < Date.now()) return null;
+  const expiresAt = parseInt(expires, 36);
+  const now = Date.now() / 1000;
+  if (expiresAt < now) return null;
 
   const expected = Buffer.from(sign(`${subject}.${expires}`));
   const actual = Buffer.from(signature);
   if (expected.length !== actual.length || !timingSafeEqual(expected, actual)) return null;
-  return viewer;
+  return { viewer, renew: expiresAt - now < SESSION_MAX_AGE_SECONDS - SESSION_RENEW_AFTER_SECONDS };
 }
 
 /** Cookie options; `secure` only over HTTPS so it also works on a LAN over plain HTTP. */

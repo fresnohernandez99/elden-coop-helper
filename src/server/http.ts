@@ -4,7 +4,7 @@ import { DecodeError } from '@/sync/binary';
 import { CatalogMismatchError } from '@/sync/snapshot';
 import { ConfigError } from './config';
 import { HttpError } from './errors';
-import { SESSION_COOKIE, type Viewer, viewerFromSessionToken } from './session';
+import { createSessionToken, readSessionToken, SESSION_COOKIE, sessionCookieOptions, type Viewer } from './session';
 
 export { HttpError };
 
@@ -39,13 +39,20 @@ export function withErrors<Context>(handler: (request: NextRequest, context: Con
 
 type ViewerHandler = (request: NextRequest, viewer: Viewer) => Promise<Response>;
 
-/** Wraps a route handler: requires a team session cookie (player or spectator) and turns errors into JSON. */
+/**
+ * Wraps a route handler: requires a team session cookie (player or spectator) and turns errors into JSON.
+ * A successful request with a session older than a day gets it renewed.
+ */
 export function withViewer(handler: ViewerHandler) {
   return async (request: NextRequest): Promise<Response> => {
     try {
-      const viewer = viewerFromSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
-      if (!viewer) throw new HttpError(401, 'Not in a team');
-      return await handler(request, viewer);
+      const session = readSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
+      if (!session) throw new HttpError(401, 'Not in a team');
+      const response = await handler(request, session.viewer);
+      if (!session.renew || !response.ok) return response;
+      const renewed = new NextResponse(response.body, response);
+      renewed.cookies.set(SESSION_COOKIE, createSessionToken(session.viewer), sessionCookieOptions(request));
+      return renewed;
     } catch (error) {
       return errorResponse(error);
     }

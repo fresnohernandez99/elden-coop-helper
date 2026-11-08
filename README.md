@@ -22,7 +22,7 @@ cp .env.example .env    # set MONGODB_URI and SESSION_SECRET
 npm run dev             # http://localhost:3000
 ```
 
-Open `http://localhost:3000`. From the lobby you can **play solo** (no account, nothing leaves the browser), **create a team**, or pick a team from the list to **join** it (with its password) or **watch** it.
+Open `http://localhost:3000`. From the lobby you can **play solo** (no account, nothing leaves the browser), go back to **your teams** with one click, **create a team**, or pick a team from the list to **join** it (with its password) or **watch** it.
 
 To let other players join from their machines, run `npm run dev -- -H 0.0.0.0` and share `http://<your-ip>:3000`.
 
@@ -61,7 +61,8 @@ On screens up to 800px wide the map takes the whole screen. Every action lives i
 - **Watching:** any team, from the lobby or its link, with **no password and no name**. Spectators see every player's progress and next destination but cannot mark anything; the server rejects any snapshot they send. Up to 20 spectators per team (per server instance on Vercel, so it is approximate).
 - **Removing players:** only the browser that created the team, which holds the creator key, sees "Remove from team" on the other players' cards. It removes the player and **bans their browser** (a random id created by each browser). It does not stop them from joining again from another browser. The creator key only travels in that request, and it is included in **Backup → Export** so it is not lost with the browser data.
 - **Leaving:** "leave team" frees your slot (joining again needs the password); "lobby" keeps you in the team.
-- Joining, creating and watching set an **httpOnly, signed session cookie** valid for 30 days, with the team, your slot and the id of your membership. After 10 wrong passwords from the same IP, joining is blocked for 15 minutes; each IP can create 5 teams per hour.
+- **Your teams:** the browser saves the name and password of every team you join or create, and the lobby lists them to enter again with one click (with your last character name). The server gives you back your own slot. A session holds one team at a time, so this is how you switch between them; × removes a team from the list (the creator key of your own team is kept).
+- Joining, creating and watching set an **httpOnly, signed session cookie** valid for 90 days (renewed once a day while you play, so it only expires after 90 days without opening the map), with the team, your slot and the id of your membership. After 10 wrong passwords from the same IP, joining is blocked for 15 minutes; each IP can create 5 teams per hour.
 - Secrets are never stored in clear: the team password with scrypt, the creator key and browser ids with SHA-256.
 
 ## Players panel
@@ -154,7 +155,7 @@ src/
 │   ├── protocol.ts               /api/sync messages
 │   └── sync.test.ts              tests (npm test)
 ├── features/                     frontend, by feature
-│   ├── lobby/                    lobby, create team, team list, join page
+│   ├── lobby/                    lobby, your teams, create team, team list, join page
 │   ├── player/                   player app shell (client only)
 │   ├── coop/                     progress: store, localStorage, teams of this browser, sync engine, backup, names
 │   ├── map/                      map, markers, popups, "pick on map" mode

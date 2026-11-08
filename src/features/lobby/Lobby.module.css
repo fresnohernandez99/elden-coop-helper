@@ -194,3 +194,13 @@
   color: #111;
   font-weight: 600;
 }
+
+.card .team .forget {
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+}

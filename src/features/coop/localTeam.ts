@@ -5,8 +5,8 @@ import { readItem, writeItem } from './storage';
  *
  * - `clientId`: random id of this browser, sent when joining a team so the host
  *   can ban it. Created once.
- * - Per team: its name, the password (to share it again) and, for the team you
- *   created, the creator key. The creator key never leaves this browser except
+ * - Per team: its name, the password (to share it again and to rejoin with one
+ *   click from the lobby) and, for the team you created, the creator key. The creator key never leaves this browser except
  *   when you kick someone; losing it means you can no longer kick.
  */
 export interface LocalTeam {
@@ -48,6 +48,18 @@ export const localTeam = {
   save(teamId: string, team: LocalTeam) {
     const teams = readTeams();
     teams[teamId] = { ...teams[teamId], ...team };
+    writeItem(TEAMS_KEY, JSON.stringify(teams));
+  },
+
+  /** Teams this browser can rejoin without typing the password, by id. */
+  joinable: (): [string, LocalTeam][] => Object.entries(readTeams()).filter(([, team]) => team.password),
+
+  /** Drops the password of a team so it leaves the lobby list; a creator key is kept. */
+  forget(teamId: string) {
+    const teams = readTeams();
+    const { creatorKey, name } = teams[teamId] ?? {};
+    if (creatorKey && name) teams[teamId] = { name, creatorKey };
+    else delete teams[teamId];
     writeItem(TEAMS_KEY, JSON.stringify(teams));
   },
 

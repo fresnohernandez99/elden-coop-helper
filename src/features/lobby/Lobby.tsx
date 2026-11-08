@@ -6,6 +6,7 @@ import { localTeam } from '@/features/coop/localTeam';
 import { CreateTeamForm } from './CreateTeamForm';
 import styles from './Lobby.module.css';
 import { TeamList } from './TeamList';
+import { YourTeams } from './YourTeams';
 
 export interface CurrentTeam {
   teamId: string;
@@ -13,8 +14,9 @@ export interface CurrentTeam {
 }
 
 /**
- * Entry point: play solo (nothing leaves the browser), create a team, or pick
- * one from the list to join (with its password) or watch (no password).
+ * Entry point: play solo (nothing leaves the browser), go back to a team you
+ * joined before, create a team, or pick one from the list to join (with its
+ * password) or watch (no password).
  */
 export function Lobby({ current }: { current: CurrentTeam | null }) {
   const [currentName, setCurrentName] = useState<string | null>(null);
@@ -38,6 +40,7 @@ export function Lobby({ current }: { current: CurrentTeam | null }) {
             Play solo
           </Link>
         </div>
+        <YourTeams currentTeamId={current && !current.spectator ? current.teamId : null} />
         <CreateTeamForm />
         <TeamList />
       </div>
