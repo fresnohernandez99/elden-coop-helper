@@ -1,20 +1,18 @@
-import { redirect } from 'next/navigation';
-import { LoginForm } from '@/features/auth/LoginForm';
+import { Lobby } from '@/features/lobby/Lobby';
 import { StatusScreen } from '@/features/player/StatusScreen';
 import { ConfigError } from '@/server/config';
 import { getSessionViewer } from '@/server/session';
 
 export const dynamic = 'force-dynamic';
 
-/** Entry point: login with character name and password. Already logged in → map. */
-export default async function LoginPage() {
-  let loggedIn: boolean;
+/** Entry point: the lobby. Offers to continue in the team of the current session, if any. */
+export default async function LobbyPage() {
+  let viewer;
   try {
-    loggedIn = (await getSessionViewer()) !== null;
+    viewer = await getSessionViewer();
   } catch (error) {
     if (error instanceof ConfigError) return <StatusScreen>Incomplete configuration: {error.message}</StatusScreen>;
     throw error;
   }
-  if (loggedIn) redirect('/map');
-  return <LoginForm />;
+  return <Lobby current={viewer && { teamId: viewer.teamId, spectator: viewer.kind === 'spectator' }} />;
 }

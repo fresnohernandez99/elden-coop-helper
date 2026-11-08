@@ -8,16 +8,18 @@ export type ImportedProgress = Pick<PlayerProgress, 'found' | 'next'>;
 interface CoopStore {
   /** Your player slot, or null for a spectator (read-only: every change is ignored). */
   me: PlayerId | null;
+  /** Team whose players are cached in this browser; null when playing solo. */
+  teamId: string | null;
   /**
-   * Your own progress plus the last received progress of the other configured
-   * players. Another player's entry is only replaced by a newer snapshot, never
-   * cleared, so it stays visible after they disconnect.
+   * Your own progress plus the last received progress of the other players of
+   * the team. Another player's entry is only replaced by a newer snapshot, so it
+   * stays visible after they disconnect; it is only cleared when they leave the team.
    */
   players: Partial<Record<PlayerId, StoredProgress>>;
   /** Other players online right now, in slot order. */
   online: PlayerId[];
 
-  initialize: (me: PlayerId | null, playerIds: readonly PlayerId[]) => void;
+  initialize: (me: PlayerId | null, playerIds: readonly PlayerId[], teamId: string | null) => void;
   toggleFound: (pinId: string) => void;
   setNext: (next: NextDestination) => void;
   clearNext: () => void;
@@ -28,6 +30,8 @@ interface CoopStore {
   /** Another player's progress, received from the server. Ignored if not newer. */
   receivePlayer: (player: PlayerId, progress: PlayerProgress, rev: number) => void;
   setOnline: (players: PlayerId[]) => void;
+  /** Forgets players who left or were removed from the team (and their cached progress). */
+  keepMembers: (members: PlayerId[]) => void;
 }
 
 /** Your own progress; always present once the store is initialized (empty for a spectator). */
@@ -41,19 +45,23 @@ export const useCoopStore = create<CoopStore>((set, get) => {
     if (!me) return;
     const current = ownProgress(get());
     const updated: StoredProgress = { ...change(current), rev: nextRev(current.rev) };
-    localProgress.saveOwn(me, updated);
+    localProgress.saveOwn(updated);
     set({ players: { ...players, [me]: updated } });
   }
 
   return {
     me: 'p1',
+    teamId: null,
     players: {},
     online: [],
 
-    initialize: (me, playerIds) => {
+    initialize: (me, playerIds, teamId) => {
       const players: CoopStore['players'] = {};
-      for (const id of playerIds) players[id] = id === me ? localProgress.loadOwn(id) : localProgress.loadCache(id);
-      set({ me, players, online: [] });
+      for (const id of playerIds) {
+        if (id === me) players[id] = localProgress.loadOwn();
+        else if (teamId) players[id] = localProgress.loadCache(teamId, id);
+      }
+      set({ me, teamId, players, online: [] });
     },
 
     toggleFound: (pinId) =>
@@ -82,15 +90,29 @@ export const useCoopStore = create<CoopStore>((set, get) => {
     },
 
     receivePlayer: (player, progress, rev) => {
-      const { me, players } = get();
-      if (player === me || rev <= (players[player]?.rev ?? 0)) return;
+      const { me, teamId, players } = get();
+      if (player === me || !teamId || rev <= (players[player]?.rev ?? 0)) return;
       const stored = { ...progress, rev };
-      localProgress.saveCache(player, stored);
+      localProgress.saveCache(teamId, player, stored);
       set({ players: { ...players, [player]: stored } });
     },
 
     setOnline: (online) => {
       if (online.join() !== get().online.join()) set({ online });
+    },
+
+    keepMembers: (members) => {
+      const { me, teamId, players } = get();
+      const gone = (Object.keys(players) as PlayerId[]).filter(
+        (id) => id !== me && (players[id]?.rev ?? 0) > 0 && !members.includes(id),
+      );
+      if (!teamId || gone.length === 0) return;
+      const kept = { ...players };
+      for (const id of gone) {
+        kept[id] = emptyProgress();
+        localProgress.removeCache(teamId, id);
+      }
+      set({ players: kept });
     },
   };
 });

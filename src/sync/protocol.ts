@@ -5,9 +5,11 @@ import { ByteReader, ByteWriter, DecodeError } from './binary';
 /**
  * Messages for POST /api/sync (application/octet-stream).
  *
- * Each player owns their data (it lives in their localStorage); the server only
- * relays each player's latest snapshot and tracks who is online. Revisions are
- * increasing timestamps set by the owner on every change.
+ * Each player owns their data (it lives in their localStorage); the server
+ * relays each player's latest snapshot within their team and tracks who is
+ * online. Revisions are increasing timestamps set by the owner on every change.
+ * Now and then the client asks the server to also save its snapshot to the
+ * database (`persist`), so spectators can see the last state of a team.
  *
  * The server numbers every stored snapshot with a sequence. A client sends the
  * last sequence it saw and receives only snapshots stored after it, so an idle
@@ -19,7 +21,7 @@ import { ByteReader, ByteWriter, DecodeError } from './binary';
  *   u32     epoch     — server epoch the client knows (0 = none)
  *   varint  knownSeq  — last sequence received in that epoch
  *   varint  rev       — the player's current local revision
- *   u8      1 if my snapshot follows, 0 otherwise
+ *   u8      flags     — bit 0: my snapshot follows; bit 1: save it to the database
  *   ...     snapshot (rest of the message)
  *
  * Response:
@@ -27,23 +29,31 @@ import { ByteReader, ByteWriter, DecodeError } from './binary';
  *   u32     epoch
  *   varint  seq       — latest sequence on the server
  *   varint  stored    — my revision held by the server (0 = none)
- *   u8      online    — bitmask of online players (bit i = PLAYER_IDS[i])
+ *   u8      members   — bitmask of the team's players (bit i = PLAYER_IDS[i]);
+ *                       bit 7: my stored revision is also saved in the database
+ *   u8      online    — bitmask of online players
  *   varint  count     — number of snapshots that follow
  *   count × { u8 player index, varint rev, varint length, snapshot }
  *
- * An idle poll takes ~14 bytes each way.
+ * An idle poll takes ~14 bytes up and ~16 down.
  */
 
-export const PROTOCOL_VERSION = 3;
+export const PROTOCOL_VERSION = 4;
 export const MAX_SYNC_REQUEST_BYTES = 2048;
 const MAX_SNAPSHOT_BYTES = 1024;
 const MAX_SYNC_RESPONSE_BYTES = MAX_PLAYERS * (MAX_SNAPSHOT_BYTES + 16) + 32;
+
+const FLAG_SNAPSHOT = 1;
+const FLAG_PERSIST = 2;
+const MEMBERS_PERSISTED = 0x80;
 
 export interface SyncRequest {
   epoch: number;
   knownSeq: number;
   rev: number;
   snapshot: Uint8Array | null;
+  /** Also save my snapshot to the database. */
+  persist: boolean;
 }
 
 export interface PlayerSnapshot {
@@ -56,6 +66,9 @@ export interface SyncResponse {
   epoch: number;
   seq: number;
   storedRev: number;
+  /** `storedRev` is also saved in the database (as far as this server instance knows). */
+  persisted: boolean;
+  members: PlayerId[];
   online: PlayerId[];
   snapshots: PlayerSnapshot[];
 }
@@ -76,10 +89,13 @@ function playerAt(index: number): PlayerId {
 
 const playerIndex = (player: PlayerId) => PLAYER_IDS.indexOf(player);
 
-export function encodeSyncRequest({ epoch, knownSeq, rev, snapshot }: SyncRequest): Uint8Array {
-  const writer = new ByteWriter().u8(PROTOCOL_VERSION).u32(epoch).varint(knownSeq).varint(rev);
-  if (snapshot) writer.u8(1).bytes(snapshot);
-  else writer.u8(0);
+const toMask = (players: PlayerId[]) => players.reduce((mask, player) => mask | (1 << playerIndex(player)), 0);
+const fromMask = (mask: number) => PLAYER_IDS.filter((_, i) => mask & (1 << i));
+
+export function encodeSyncRequest({ epoch, knownSeq, rev, snapshot, persist }: SyncRequest): Uint8Array {
+  const flags = (snapshot ? FLAG_SNAPSHOT : 0) | (persist ? FLAG_PERSIST : 0);
+  const writer = new ByteWriter().u8(PROTOCOL_VERSION).u32(epoch).varint(knownSeq).varint(rev).u8(flags);
+  if (snapshot) writer.bytes(snapshot);
   return writer.finish();
 }
 
@@ -88,23 +104,25 @@ export function decodeSyncRequest(bytes: Uint8Array): SyncRequest {
   const epoch = reader.u32();
   const knownSeq = reader.varint();
   const rev = reader.varint();
-  const flag = reader.u8();
-  if (flag === 0) {
+  const flags = reader.u8();
+  if (flags & ~(FLAG_SNAPSHOT | FLAG_PERSIST)) throw new DecodeError('Invalid flags');
+  const persist = (flags & FLAG_PERSIST) !== 0;
+  if (!(flags & FLAG_SNAPSHOT)) {
     reader.expectEnd();
-    return { epoch, knownSeq, rev, snapshot: null };
+    return { epoch, knownSeq, rev, snapshot: null, persist };
   }
-  if (flag !== 1) throw new DecodeError('Invalid snapshot flag');
-  return { epoch, knownSeq, rev, snapshot: reader.rest() };
+  return { epoch, knownSeq, rev, snapshot: reader.rest(), persist };
 }
 
-export function encodeSyncResponse({ epoch, seq, storedRev, online, snapshots }: SyncResponse): Uint8Array {
-  const onlineMask = online.reduce((mask, player) => mask | (1 << playerIndex(player)), 0);
+export function encodeSyncResponse(response: SyncResponse): Uint8Array {
+  const { epoch, seq, storedRev, persisted, members, online, snapshots } = response;
   const writer = new ByteWriter()
     .u8(PROTOCOL_VERSION)
     .u32(epoch)
     .varint(seq)
     .varint(storedRev)
-    .u8(onlineMask)
+    .u8(toMask(members) | (persisted ? MEMBERS_PERSISTED : 0))
+    .u8(toMask(online))
     .varint(snapshots.length);
   for (const entry of snapshots) {
     writer.u8(playerIndex(entry.player)).varint(entry.rev).sizedBytes(entry.snapshot);
@@ -117,8 +135,10 @@ export function decodeSyncResponse(bytes: Uint8Array): SyncResponse {
   const epoch = reader.u32();
   const seq = reader.varint();
   const storedRev = reader.varint();
-  const onlineMask = reader.u8();
-  const online = PLAYER_IDS.filter((_, i) => onlineMask & (1 << i));
+  const membersByte = reader.u8();
+  const persisted = (membersByte & MEMBERS_PERSISTED) !== 0;
+  const members = fromMask(membersByte & ~MEMBERS_PERSISTED);
+  const online = fromMask(reader.u8());
 
   const count = reader.varint();
   if (count > MAX_PLAYERS) throw new DecodeError('Too many snapshots');
@@ -129,5 +149,5 @@ export function decodeSyncResponse(bytes: Uint8Array): SyncResponse {
     snapshots.push({ player, rev, snapshot: reader.sizedBytes(MAX_SNAPSHOT_BYTES).slice() });
   }
   reader.expectEnd();
-  return { epoch, seq, storedRev, online, snapshots };
+  return { epoch, seq, storedRev, persisted, members, online, snapshots };
 }

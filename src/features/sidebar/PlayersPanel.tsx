@@ -1,6 +1,8 @@
-import { useMemo } from 'react';
-import { NOTE_MAX_LENGTH } from '@/config/constants';
+import { useMemo, useState } from 'react';
+import { teamsApi } from '@/api/teamsApi';
+import { NOTE_MAX_LENGTH, PLAYER_IDS } from '@/config/constants';
 import { useCoopStore } from '@/features/coop/coopStore';
+import { localTeam } from '@/features/coop/localTeam';
 import { usePlayerLabel } from '@/features/coop/playerNames';
 import {
   countFound,
@@ -11,6 +13,7 @@ import {
   useOnlineCount,
   useVisiblePlayers,
 } from '@/features/coop/selectors';
+import { showToast } from '@/features/notifications/toastStore';
 import { usePins } from '@/features/pins/PinsContext';
 import { useEnabledCategories } from '@/features/pins/useEnabledCategories';
 import { useSession } from '@/features/session/SessionContext';
@@ -27,7 +30,7 @@ import styles from './PlayersPanel.module.css';
  * Progress only counts the categories that are shown on the map.
  */
 export function PlayersPanel() {
-  const { me } = useSession();
+  const { me, team } = useSession();
   const { pins: allPins } = usePins();
   const enabled = useEnabledCategories();
   const currentMap = useUiStore((s) => s.currentMap);
@@ -38,11 +41,13 @@ export function PlayersPanel() {
   const others = players.filter((p) => p !== me);
 
   return (
-    <Section title="Players" actions={<small className={styles.muted}>{onlineCount} online</small>}>
+    <Section title="Players" actions={team && <small className={styles.muted}>{onlineCount} online</small>}>
       {players.map((p) => (
         <PlayerCard key={p} player={p} pins={pins} pinsOnMap={pinsOnMap} mapTitle={currentMap ?? ''} />
       ))}
-      {others.length === 0 && <p className={styles.empty}>No progress from {me ? 'other ' : ''}players yet</p>}
+      {team && others.length === 0 && (
+        <p className={styles.empty}>No progress from {me ? 'other ' : ''}players yet</p>
+      )}
       {me && <NextDestinationForm />}
     </Section>
   );
@@ -110,7 +115,47 @@ function PlayerCard({ player, pins, pinsOnMap, mapTitle }: PlayerCardProps) {
         )}
       </div>
       {next?.note && <div className={styles.note}>“{next.note}”</div>}
+      {player !== me && <KickButton player={player} />}
     </article>
+  );
+}
+
+/**
+ * Only in the browser that created the team (it holds the creator key): removes
+ * the player and bans their browser. Asks for a second click to confirm.
+ */
+function KickButton({ player }: { player: PlayerId }) {
+  const { team } = useSession();
+  const playerLabel = usePlayerLabel();
+  const [creatorKey] = useState(() => (team ? localTeam.get(team.id)?.creatorKey : undefined));
+  const [confirming, setConfirming] = useState(false);
+  const [busy, setBusy] = useState(false);
+  if (!team || !creatorKey) return null;
+
+  async function kick() {
+    if (!confirming) {
+      setConfirming(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await teamsApi.kick(team!.id, creatorKey!, player);
+      useCoopStore.getState().keepMembers(PLAYER_IDS.filter((id) => id !== player));
+      showToast(`${playerLabel(player)} was removed from the team`);
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Could not remove the player');
+    } finally {
+      setBusy(false);
+      setConfirming(false);
+    }
+  }
+
+  return (
+    <span className={styles.kick}>
+      <Button size="small" disabled={busy} onClick={() => void kick()} onBlur={() => setConfirming(false)}>
+        {confirming ? 'Remove and ban? Click again' : 'Remove from team'}
+      </Button>
+    </span>
   );
 }
 

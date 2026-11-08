@@ -1,4 +1,4 @@
-export type PlayerId = 'p1' | 'p2' | 'p3' | 'p4' | 'p5' | 'p6';
+export type PlayerId = 'p1' | 'p2' | 'p3';
 
 export type LatLng = [lat: number, lng: number];
 
@@ -40,12 +40,24 @@ export interface PlayerProfile {
   color: string;
 }
 
+export interface TeamInfo {
+  id: string;
+  name: string;
+}
+
 export interface Session {
-  /** Your player slot, or null when watching as a spectator (read-only). */
+  /** Your player slot, or null when watching as a spectator (read-only). Solo play uses p1. */
   me: PlayerId | null;
-  /** Configured player slots (those with a password), in slot order. */
+  /** Player slots shown in the UI, in slot order (only p1 when playing solo). */
   players: PlayerProfile[];
+  /** The team you play in or watch; null when playing solo (nothing is synced). */
+  team: TeamInfo | null;
   tileUrl: string;
+}
+
+/** A team as listed in the lobby. */
+export interface TeamSummary extends TeamInfo {
+  players: string[];
 }
 
 export interface NextDestination {

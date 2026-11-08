@@ -7,7 +7,7 @@ It is not a real in-game overlay: it never touches the game process, it is just 
 ## Use
 
 1. Install it (see "Build") and start it. It lives in the **tray**: from there you get show/hide, click-through, settings and quit.
-2. On first start it asks for the **map URL** (where the Next.js app is served) and the shortcuts. Log in once in the map window; the session cookie is kept.
+2. On first start it asks for the **map URL** (where the Next.js app is served) and the shortcuts. Join your team (or play solo) once in the map window; the session cookie and your progress are kept.
 3. In Elden Ring set **Display mode → Borderless windowed**. Windows does not draw other windows over exclusive full screen.
 
 | Default shortcut | Action |
@@ -17,7 +17,7 @@ It is not a real in-game overlay: it never touches the game process, it is just 
 
 - Drag the window by the gold handle at its top edge and resize it from its edges. Position and size are remembered.
 - Opacity is set in Settings (30–100%).
-- Shortcuts use the format `Backslash`, `Ctrl+Shift+M`, `Alt+F1`, `Ctrl+Alt+Digit1`, etc. If another app already took one, Settings says so.
+- To change a shortcut, click its field in Settings and press the keys (`Esc` cancels). A single key like `\` works, or a combination like `Ctrl+Shift+M`. Shortcuts are paused while Settings is open. If another app already took one, Settings says so.
 - Settings are saved in `%APPDATA%\com.eldencoop.overlay\config.json`.
 
 ## Build

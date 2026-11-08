@@ -2,44 +2,62 @@ import 'server-only';
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { cookies } from 'next/headers';
 import type { NextRequest } from 'next/server';
+import { PLAYER_IDS } from '@/config/constants';
 import type { PlayerId } from '@/types/domain';
-import { getConfig, isConfiguredPlayer } from './config';
+import { getConfig } from './config';
 
 /**
  * Stateless session in a signed, httpOnly cookie: `<subject>.<expires>.<signature>`.
- * The subject is a player id (`p1`) or `spectator-<random id>`.
+ * The subject is `p:<team id>:<slot>:<join id>` for a player or
+ * `s:<team id>:<random id>` for a spectator. Without a cookie you play solo.
  *
- * The signing key is derived from every password (plus SESSION_SECRET), so
- * changing a password logs everyone out.
+ * The join id changes when a player is kicked and someone else takes the slot,
+ * so an old cookie stops working (see relay.ts for how that is checked).
+ * Changing SESSION_SECRET logs everyone out.
  */
 
-/** Who is behind a session: a player, or a read-only spectator with a random id. */
-export type Viewer = { kind: 'player'; player: PlayerId } | { kind: 'spectator'; id: string };
-
-const SPECTATOR_PREFIX = 'spectator-';
+/** Who is behind a session: a team player, or a read-only spectator of a team. */
+export type Viewer =
+  | { kind: 'player'; teamId: string; player: PlayerId; joinId: string }
+  | { kind: 'spectator'; teamId: string; id: string };
 
 export const SESSION_COOKIE = 'ecm_session';
 const SESSION_MAX_AGE_SECONDS = 30 * 24 * 60 * 60;
+const TEAM_ID = /^[0-9a-f]{24}$/;
+const TOKEN = /^[A-Za-z0-9_-]{8,32}$/;
 
-function signingKey(): Buffer {
-  const { players, passwords, sessionSecret } = getConfig();
-  const secrets = [...players.map((id) => `${id}=${passwords[id]}`), sessionSecret];
-  return createHash('sha256').update(secrets.join('\0')).digest();
-}
+const signingKey = () => createHash('sha256').update(`session\0${getConfig().sessionSecret}`).digest();
 
 const sign = (payload: string) => createHmac('sha256', signingKey()).update(payload).digest('base64url');
 
-/** Token for a player, or for a new spectator when `player` is null. */
-export function createSessionToken(player: PlayerId | null): string {
-  const subject = player ?? SPECTATOR_PREFIX + randomBytes(9).toString('base64url');
-  const expires = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS;
-  const payload = `${subject}.${expires.toString(36)}`;
-  return `${payload}.${sign(payload)}`;
+function subjectOf(viewer: Viewer): string {
+  return viewer.kind === 'player'
+    ? `p:${viewer.teamId}:${viewer.player}:${viewer.joinId}`
+    : `s:${viewer.teamId}:${viewer.id}`;
 }
 
 function viewerFor(subject: string): Viewer | null {
-  if (subject.startsWith(SPECTATOR_PREFIX)) return { kind: 'spectator', id: subject.slice(SPECTATOR_PREFIX.length) };
-  return isConfiguredPlayer(subject as PlayerId) ? { kind: 'player', player: subject as PlayerId } : null;
+  const [kind, teamId = '', ...rest] = subject.split(':');
+  if (!TEAM_ID.test(teamId)) return null;
+  if (kind === 'p' && rest.length === 2) {
+    const [player, joinId = ''] = rest as [PlayerId, string];
+    return PLAYER_IDS.includes(player) && TOKEN.test(joinId) ? { kind: 'player', teamId, player, joinId } : null;
+  }
+  if (kind === 's' && rest.length === 1 && TOKEN.test(rest[0]!)) return { kind: 'spectator', teamId, id: rest[0]! };
+  return null;
+}
+
+/** A new spectator of a team, with a random id that holds their seat. */
+export const newSpectator = (teamId: string): Viewer => ({
+  kind: 'spectator',
+  teamId,
+  id: randomBytes(9).toString('base64url'),
+});
+
+export function createSessionToken(viewer: Viewer): string {
+  const expires = Math.floor(Date.now() / 1000) + SESSION_MAX_AGE_SECONDS;
+  const payload = `${subjectOf(viewer)}.${expires.toString(36)}`;
+  return `${payload}.${sign(payload)}`;
 }
 
 /** Returns the viewer of a valid, unexpired token, or null. */
@@ -62,7 +80,8 @@ export function sessionCookieOptions(request: NextRequest, maxAge = SESSION_MAX_
   return { httpOnly: true, sameSite: 'lax' as const, secure: https, path: '/', maxAge };
 }
 
-/** Logged-in player or spectator in server components. */
+/** Team player or spectator in server components; null when there is no team session. */
 export async function getSessionViewer(): Promise<Viewer | null> {
-  return viewerFromSessionToken((await cookies()).get(SESSION_COOKIE)?.value);
+  const token = (await cookies()).get(SESSION_COOKIE)?.value;
+  return token ? viewerFromSessionToken(token) : null;
 }

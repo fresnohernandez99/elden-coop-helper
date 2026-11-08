@@ -3,17 +3,10 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { DecodeError } from '@/sync/binary';
 import { CatalogMismatchError } from '@/sync/snapshot';
 import { ConfigError } from './config';
+import { HttpError } from './errors';
 import { SESSION_COOKIE, type Viewer, viewerFromSessionToken } from './session';
 
-/** Error with an HTTP status, returned to the client as { error }. */
-export class HttpError extends Error {
-  constructor(
-    readonly status: number,
-    message: string,
-  ) {
-    super(message);
-  }
-}
+export { HttpError };
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
@@ -33,14 +26,25 @@ export function errorResponse(error: unknown): Response {
   return json({ error: 'Internal error' }, 500);
 }
 
+/** Wraps a route handler so thrown errors become JSON responses. */
+export function withErrors<Context>(handler: (request: NextRequest, context: Context) => Promise<Response>) {
+  return async (request: NextRequest, context: Context): Promise<Response> => {
+    try {
+      return await handler(request, context);
+    } catch (error) {
+      return errorResponse(error);
+    }
+  };
+}
+
 type ViewerHandler = (request: NextRequest, viewer: Viewer) => Promise<Response>;
 
-/** Wraps a route handler: requires a session cookie (player or spectator) and turns errors into JSON. */
+/** Wraps a route handler: requires a team session cookie (player or spectator) and turns errors into JSON. */
 export function withViewer(handler: ViewerHandler) {
   return async (request: NextRequest): Promise<Response> => {
     try {
       const viewer = viewerFromSessionToken(request.cookies.get(SESSION_COOKIE)?.value);
-      if (!viewer) throw new HttpError(401, 'Not logged in');
+      if (!viewer) throw new HttpError(401, 'Not in a team');
       return await handler(request, viewer);
     } catch (error) {
       return errorResponse(error);

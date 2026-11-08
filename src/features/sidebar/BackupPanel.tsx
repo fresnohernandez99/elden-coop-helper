@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { downloadBackup, readBackup } from '@/features/coop/backup';
 import { ownProgress, useCoopStore } from '@/features/coop/coopStore';
+import { localTeam } from '@/features/coop/localTeam';
 import { usePlayerNames } from '@/features/coop/playerNames';
 import { showToast } from '@/features/notifications/toastStore';
 import { Button } from '@/shared/ui/Button';
@@ -14,13 +15,14 @@ export function BackupPanel({ me }: { me: PlayerId }) {
   const fileInput = useRef<HTMLInputElement>(null);
 
   const exportProgress = () => {
-    downloadBackup(ownProgress(useCoopStore.getState()), names[me]);
+    downloadBackup(ownProgress(useCoopStore.getState()), localTeam.creatorKeys(), names[me]);
   };
 
   const importProgress = async (file: File) => {
     try {
-      const progress = await readBackup(file);
+      const { progress, teams } = await readBackup(file);
       useCoopStore.getState().mergeOwn(progress);
+      for (const [id, team] of Object.entries(teams)) localTeam.save(id, team);
       showToast(`Backup imported: ${Object.keys(progress.found).length} pins`);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Could not import');
@@ -29,7 +31,7 @@ export function BackupPanel({ me }: { me: PlayerId }) {
 
   return (
     <Section title="Backup">
-      <p className={styles.hint}>Your progress is saved in this browser.</p>
+      <p className={styles.hint}>Your progress (and the keys of the teams you created) is saved in this browser.</p>
       <div className={styles.actions}>
         <Button onClick={exportProgress}>Export</Button>
         <Button onClick={() => fileInput.current?.click()}>Import</Button>

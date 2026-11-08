@@ -72,3 +72,125 @@
   font-size: 13px;
   cursor: pointer;
 }
+
+.lobby {
+  display: grid;
+  gap: 16px;
+  width: min(520px, 100%);
+}
+
+.lobby .card {
+  width: 100%;
+}
+
+.subtitle {
+  margin: -4px 0 0;
+  text-align: center;
+  color: var(--muted);
+}
+
+.heading {
+  margin: 0;
+  font-size: 13px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--gold);
+}
+
+.hint {
+  margin: 0;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.teams {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.team {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--bg);
+}
+
+.teamInfo {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+
+.teamInfo strong,
+.teamInfo small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.secret {
+  padding: 10px;
+  border: 1px dashed var(--gold);
+  border-radius: 6px;
+  text-align: center;
+  font: 600 28px/1 ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 6px;
+  color: var(--gold);
+}
+
+.link {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.card a {
+  color: var(--gold);
+}
+
+.card .joinLink {
+  padding: 2px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.card .team button {
+  padding: 2px 8px;
+}
+
+.card .primaryLink,
+.card .secondaryLink {
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel-2);
+  text-align: center;
+  text-decoration: none;
+  color: var(--text);
+}
+
+.card .primaryLink {
+  border-color: var(--gold);
+  background: var(--gold);
+  color: #111;
+  font-weight: 600;
+}

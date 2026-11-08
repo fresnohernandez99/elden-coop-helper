@@ -1,0 +1,17 @@
+.line {
+  margin: 0 0 8px;
+}
+
+.muted {
+  color: var(--muted);
+}
+
+.secret {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--gold);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  letter-spacing: 2px;
+  cursor: pointer;
+}

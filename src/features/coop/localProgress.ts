@@ -1,21 +1,25 @@
 import { CHARACTER_NAME_MAX_LENGTH } from '@/config/constants';
 import type { NextDestination, PlayerId, PlayerProgress } from '@/types/domain';
+import { readItem, removeItem, writeItem } from './storage';
 
 /**
  * Progress stored in this browser's localStorage.
  *
- * - Your own progress is the source of truth: only its owner changes it.
- * - The other player's is a cached copy, so it stays visible even if the
- *   server lost their snapshot while they are offline.
+ * - Your own progress is the source of truth: only you change it. There is one
+ *   per browser, used solo and in whatever team (and slot) you play.
+ * - The other players' is a cached copy per team, so it stays visible even if
+ *   the server lost their snapshot while they are offline.
  */
 export interface StoredProgress extends PlayerProgress {
   /** Increasing timestamp; changes on every modification. */
   rev: number;
 }
 
-const ownKey = (player: PlayerId) => `elden-coop-map.progress.${player}`;
-const cacheKey = (player: PlayerId) => `elden-coop-map.cache.${player}`;
+const OWN_KEY = 'elden-coop-map.progress';
+const cacheKey = (teamId: string, player: PlayerId) => `elden-coop-map.cache.${teamId}.${player}`;
 const LAST_NAME_KEY = 'elden-coop-map.last-name';
+/** Before teams, your progress was stored under the slot of a fixed password. */
+const LEGACY_OWN_KEYS = ['p1', 'p2', 'p3', 'p4', 'p5', 'p6'].map((slot) => `elden-coop-map.progress.${slot}`);
 
 export const emptyProgress = (rev = 0): StoredProgress => ({ rev, name: '', found: {}, next: null });
 
@@ -50,22 +54,6 @@ export function parseStoredProgress(value: unknown): StoredProgress | null {
   };
 }
 
-function readItem(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
-}
-
-function writeItem(key: string, value: string) {
-  try {
-    localStorage.setItem(key, value);
-  } catch {
-    // No storage (private mode, quota exceeded): keep going in memory.
-  }
-}
-
 function readProgress(key: string): StoredProgress | null {
   const raw = readItem(key);
   if (!raw) return null;
@@ -76,27 +64,37 @@ function readProgress(key: string): StoredProgress | null {
   }
 }
 
-export const localProgress = {
-  loadOwn: (player: PlayerId) => readProgress(ownKey(player)) ?? emptyProgress(nextRev(0)),
-  saveOwn: (player: PlayerId, progress: StoredProgress) => writeItem(ownKey(player), JSON.stringify(progress)),
-  loadCache: (player: PlayerId) => readProgress(cacheKey(player)) ?? emptyProgress(),
-  saveCache: (player: PlayerId, progress: StoredProgress) => writeItem(cacheKey(player), JSON.stringify(progress)),
+/** The old per-slot progress with the most pins, moved to the single key once. */
+function migrateLegacyOwn(): StoredProgress | null {
+  const legacy = LEGACY_OWN_KEYS.map(readProgress).filter((p): p is StoredProgress => !!p);
+  const best = legacy.sort((a, b) => Object.keys(b.found).length - Object.keys(a.found).length || b.rev - a.rev)[0];
+  if (best) writeItem(OWN_KEY, JSON.stringify(best));
+  return best ?? null;
+}
 
-  /** Last character name typed on the login form, to prefill it. */
+export const localProgress = {
+  loadOwn: () => readProgress(OWN_KEY) ?? migrateLegacyOwn() ?? emptyProgress(nextRev(0)),
+  saveOwn: (progress: StoredProgress) => writeItem(OWN_KEY, JSON.stringify(progress)),
+  loadCache: (teamId: string, player: PlayerId) => readProgress(cacheKey(teamId, player)) ?? emptyProgress(),
+  saveCache: (teamId: string, player: PlayerId, progress: StoredProgress) =>
+    writeItem(cacheKey(teamId, player), JSON.stringify(progress)),
+  removeCache: (teamId: string, player: PlayerId) => removeItem(cacheKey(teamId, player)),
+
+  /** Last name typed when creating or joining a team, to prefill it. */
   loadLastName: () => readItem(LAST_NAME_KEY) ?? '',
 
   /** Sets the character name of your own progress (new revision if it changed). */
-  setOwnName(player: PlayerId, name: string) {
+  setOwnName(name: string) {
     const trimmed = name.trim().slice(0, CHARACTER_NAME_MAX_LENGTH);
     writeItem(LAST_NAME_KEY, trimmed);
-    const own = this.loadOwn(player);
-    if (own.name !== trimmed) this.saveOwn(player, { ...own, name: trimmed, rev: nextRev(own.rev) });
+    const own = this.loadOwn();
+    if (own.name !== trimmed) this.saveOwn({ ...own, name: trimmed, rev: nextRev(own.rev) });
   },
 
   /** Notifies when another tab of this browser changes your own progress. */
-  subscribeOwn(player: PlayerId, onChange: (progress: StoredProgress) => void): () => void {
+  subscribeOwn(onChange: (progress: StoredProgress) => void): () => void {
     const listener = (event: StorageEvent) => {
-      if (event.key !== ownKey(player) || !event.newValue) return;
+      if (event.key !== OWN_KEY || !event.newValue) return;
       try {
         const progress = parseStoredProgress(JSON.parse(event.newValue));
         if (progress) onChange(progress);

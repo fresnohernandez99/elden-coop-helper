@@ -97,30 +97,54 @@ describe('snapshot', () => {
 
 describe('protocol', () => {
   it('keeps an idle poll tiny', () => {
-    const request = { epoch: 0xdeadbeef, knownSeq: 42, rev: Date.now(), snapshot: null };
+    const request = { epoch: 0xdeadbeef, knownSeq: 42, rev: Date.now(), snapshot: null, persist: false };
     const bytes = encodeSyncRequest(request);
     expect(decodeSyncRequest(bytes)).toEqual(request);
     expect(bytes.length).toBeLessThanOrEqual(16);
 
-    const response = { epoch: 0xdeadbeef, seq: 42, storedRev: Date.now(), online: ['p1', 'p3'] as const, snapshots: [] };
-    const responseBytes = encodeSyncResponse({ ...response, online: [...response.online] });
-    expect(responseBytes.length).toBeLessThanOrEqual(16);
+    const response = {
+      epoch: 0xdeadbeef,
+      seq: 42,
+      storedRev: Date.now(),
+      persisted: true,
+      members: ['p1', 'p2', 'p3'] as PlayerId[],
+      online: ['p1', 'p3'] as PlayerId[],
+      snapshots: [],
+    };
+    const responseBytes = encodeSyncResponse(response);
+    expect(decodeSyncResponse(responseBytes)).toEqual(response);
+    expect(responseBytes.length).toBeLessThanOrEqual(17);
   });
 
   it('round-trips a response with several players', () => {
-    const snapshots = (['p2', 'p5'] as const).map((player, i) => ({
+    const snapshots = (['p2', 'p3'] as const).map((player, i) => ({
       player,
       rev: 1000 + i,
       snapshot: encodeSnapshot(progress(allIds.slice(i, i + 3), null, `Player ${player}`), catalog),
     }));
-    const response = { epoch: 7, seq: 9, storedRev: 5, online: ['p1', 'p2', 'p5', 'p6'] as PlayerId[], snapshots };
+    const response = {
+      epoch: 7,
+      seq: 9,
+      storedRev: 5,
+      persisted: false,
+      members: ['p1', 'p2', 'p3'] as PlayerId[],
+      online: ['p1', 'p3'] as PlayerId[],
+      snapshots,
+    };
     expect(decodeSyncResponse(encodeSyncResponse(response))).toEqual(response);
   });
 
   it('rejects unknown player indices', () => {
-    const bytes = encodeSyncResponse({ epoch: 1, seq: 1, storedRev: 0, online: [], snapshots: [] });
+    const empty = { epoch: 1, seq: 1, storedRev: 0, persisted: false, members: [], online: [], snapshots: [] };
+    const bytes = encodeSyncResponse(empty);
     const tampered = new Uint8Array([...bytes.slice(0, -1), 1, 9, 1, 0]);
     expect(() => decodeSyncResponse(tampered)).toThrow(DecodeError);
+  });
+
+  it('round-trips a snapshot that must be saved', () => {
+    const snapshot = encodeSnapshot(progress(allIds.slice(0, 5)), catalog);
+    const request = { epoch: 3, knownSeq: 1, rev: 99, snapshot, persist: true };
+    expect(decodeSyncRequest(encodeSyncRequest(request))).toEqual(request);
   });
 
   it('rejects another protocol version', () => {

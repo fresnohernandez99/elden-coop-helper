@@ -18,7 +18,7 @@ export function PlayerApp({ session }: PlayerAppProps) {
   // Load the progress stored in this browser once, before the first render.
   useState(() => {
     const coop = useCoopStore.getState();
-    coop.initialize(session.me, session.players.map((p) => p.id));
+    coop.initialize(session.me, session.players.map((p) => p.id), session.team?.id ?? null);
     useUiStore.getState().setNextNote(ownProgress(useCoopStore.getState()).next?.note ?? '');
   });
 

@@ -1,6 +1,7 @@
+import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
-import { authApi } from '@/api/authApi';
+import { teamsApi } from '@/api/teamsApi';
 import { usePlayerNames } from '@/features/coop/playerNames';
 import { showToast } from '@/features/notifications/toastStore';
 import { useSession } from '@/features/session/SessionContext';
@@ -10,6 +11,7 @@ import { CategoryFilter } from './CategoryFilter';
 import { MapTabs } from './MapTabs';
 import { PlayersPanel } from './PlayersPanel';
 import { SearchPanel } from './SearchPanel';
+import { TeamPanel } from './TeamPanel';
 import styles from './Sidebar.module.css';
 
 /**
@@ -17,7 +19,7 @@ import styles from './Sidebar.module.css';
  * drawer opened from the top-left button, so the rest of the screen is just the map.
  */
 export function Sidebar() {
-  const { me } = useSession();
+  const { me, team } = useSession();
   const names = usePlayerNames();
   const open = useUiStore((s) => s.sidebarOpen);
   const setOpen = useUiStore((s) => s.setSidebarOpen);
@@ -37,14 +39,24 @@ export function Sidebar() {
           <div>
             <h1 className={styles.title}>Elden Co-op Map</h1>
             <p className={styles.subtitle}>
-              {me ? (
+              {!team ? (
+                <>Playing solo · </>
+              ) : me ? (
                 <>
-                  Playing as <strong style={{ color: 'var(--me)' }}>{names[me]}</strong> ·{' '}
-                  <LogoutButton label="switch character" />
+                  <strong style={{ color: 'var(--me)' }}>{names[me]}</strong> in <strong>{team.name}</strong> ·{' '}
                 </>
               ) : (
                 <>
-                  Watching as <strong>spectator</strong> (read-only) · <LogoutButton label="leave" />
+                  Watching <strong>{team.name}</strong> (read-only) ·{' '}
+                </>
+              )}
+              <Link href="/" className={styles.link}>
+                lobby
+              </Link>
+              {team && (
+                <>
+                  {' · '}
+                  <LeaveButton teamId={team.id} label={me ? 'leave team' : 'stop watching'} />
                 </>
               )}
             </p>
@@ -54,6 +66,7 @@ export function Sidebar() {
           </button>
         </header>
 
+        {team && me && <TeamPanel team={team} />}
         <PlayersPanel />
         <MapTabs />
         <SearchPanel />
@@ -66,21 +79,24 @@ export function Sidebar() {
   );
 }
 
-/** Logs out so you can log in again (another character name, or as a player). Progress stays. */
-function LogoutButton({ label }: { label: string }) {
+/**
+ * Leaves the team (a player frees their slot; joining again needs the password)
+ * or stops watching. Your own progress stays in this browser.
+ */
+function LeaveButton({ teamId, label }: { teamId: string; label: string }) {
   const router = useRouter();
 
-  const logout = async () => {
+  const leave = async () => {
     try {
-      await authApi.logout();
+      await teamsApi.leave(teamId);
       router.replace('/');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Could not log out');
+      showToast(error instanceof Error ? error.message : 'Could not leave the team');
     }
   };
 
   return (
-    <button type="button" className={styles.link} onClick={() => void logout()}>
+    <button type="button" className={styles.link} onClick={() => void leave()}>
       {label}
     </button>
   );

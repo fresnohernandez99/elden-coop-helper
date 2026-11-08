@@ -9,7 +9,7 @@ export function AppLayout() {
   const { me, players } = useSession();
   useCoopSync();
 
-  // Player colors come from the server and are used as CSS variables (--p1 … --p6, --me).
+  // Player colors come from the server and are used as CSS variables (--p1 … --p3, --me).
   // Spectators have no color of their own and keep the default --me.
   const playerColors = Object.fromEntries([
     ...players.map((p) => [`--${p.id}`, p.color]),
