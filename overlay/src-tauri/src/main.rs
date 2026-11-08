@@ -9,7 +9,7 @@ use tauri::{
     menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem},
     tray::TrayIconBuilder,
     webview::PageLoadEvent,
-    AppHandle, Manager, RunEvent, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, Wry,
+    AppHandle, Manager, RunEvent, State, Url, WebviewUrl, WebviewWindow, WebviewWindowBuilder, WindowEvent, Wry,
 };
 use tauri_plugin_global_shortcut::{GlobalShortcutExt, Shortcut, ShortcutState};
 use tauri_plugin_window_state::StateFlags;
@@ -78,7 +78,7 @@ fn parse_url(url: &str) -> Result<Url, String> {
 
 fn parse_shortcut(text: &str) -> Result<Shortcut, String> {
     text.parse()
-        .map_err(|_| format!("\"{text}\" is not a valid shortcut. Example: Ctrl+Shift+M"))
+        .map_err(|_| format!("\"{text}\" is not a valid shortcut. Click the field and press the keys."))
 }
 
 // ---- shortcuts ----
@@ -217,14 +217,27 @@ fn show_settings(app: &AppHandle) {
         let _ = window.set_focus();
         return;
     }
-    let _ = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("index.html".into()))
+    // A registered global shortcut never reaches the page, so recording one in
+    // Settings needs them off while it is open.
+    let _ = app.global_shortcut().unregister_all();
+    let Ok(window) = WebviewWindowBuilder::new(app, SETTINGS, WebviewUrl::App("index.html".into()))
         .title("Elden Co-op Overlay")
         .inner_size(460.0, 600.0)
         .resizable(false)
         .maximizable(false)
         .center()
         .always_on_top(true)
-        .build();
+        .build()
+    else {
+        return;
+    };
+    let handle = app.clone();
+    window.on_window_event(move |event| {
+        if let WindowEvent::Destroyed = event {
+            let config = handle.state::<Overlay>().config.lock().unwrap().clone();
+            let _ = register_shortcuts(&handle, &config);
+        }
+    });
 }
 
 #[tauri::command]
@@ -241,7 +254,8 @@ fn save_config(app: AppHandle, state: State<Overlay>, mut config: Config) -> Res
 
     let previous = state.config.lock().unwrap().clone();
     if let Err(error) = register_shortcuts(&app, &config) {
-        let _ = register_shortcuts(&app, &previous);
+        // Settings stays open, so keep them off; closing it registers the saved ones.
+        let _ = app.global_shortcut().unregister_all();
         return Err(error);
     }
     write_config(&app, &config)?;
