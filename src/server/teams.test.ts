@@ -5,12 +5,14 @@ import { HttpError } from './errors';
 import { relay } from './relay';
 import {
   createTeam,
+  getRoster,
   getTeam,
   joinTeam,
   kickPlayer,
   leaveTeam,
   listTeams,
   saveSnapshot,
+  transferOwnership,
   type CreatedTeam,
 } from './teams';
 
@@ -90,20 +92,75 @@ describe('teams', () => {
     expect((await getTeam(team.team.id))?.members.find((m) => m.slot === 'p2')?.name).toBe('Ana the Bold');
   });
 
-  it('only lets the creator kick, and bans the kicked browser', async () => {
-    const team = await create();
-    await join(team, 'Ana', 2);
-    await expectStatus(kickPlayer(team.team.id, 'not-the-key', 'p2'), 403);
-    expect(await kickPlayer(team.team.id, team.creatorKey, 'p2')).toBe(true);
-    await expectStatus(join(team, 'Ana', 2), 403);
-    expect((await join(team, 'Other', 3)).slot).toBe('p2');
-  });
-
-  it('frees the slot when a player leaves', async () => {
+  it('only lets the owner kick, and bans the kicked browser', async () => {
     const team = await create();
     const ana = await join(team, 'Ana', 2);
-    await leaveTeam(team.team.id, ana.slot, ana.joinId);
-    expect((await getTeam(team.team.id))?.members).toHaveLength(1);
+    await join(team, 'Bob', 3);
+    await expectStatus(kickPlayer(team.team.id, { creatorKey: 'not-the-key' }, 'p2'), 403);
+    await expectStatus(kickPlayer(team.team.id, { joinId: ana.joinId }, 'p3'), 403);
+    expect(await kickPlayer(team.team.id, { creatorKey: team.creatorKey }, 'p2')).toBe(true);
+    expect(await kickPlayer(team.team.id, { joinId: team.joinId }, 'p3')).toBe(true);
+    await expectStatus(join(team, 'Ana', 2), 403);
+    expect((await join(team, 'Other', 4)).slot).toBe('p2');
+  });
+
+  it('frees the slot and deletes the saved snapshot when a player leaves', async () => {
+    const team = await create();
+    const ana = await join(team, 'Ana', 2);
+    await saveSnapshot(team.team.id, 'p2', ana.joinId, 3, new Uint8Array([3]));
+    expect(await leaveTeam(team.team.id, { slot: ana.slot, joinId: ana.joinId })).toBe('p2');
+    const saved = await getTeam(team.team.id);
+    expect(saved?.members).toHaveLength(1);
+    expect(saved?.snapshots).toEqual([]);
+  });
+
+  it('lets a browser leave by its client id (from the lobby)', async () => {
+    const team = await create();
+    await join(team, 'Ana', 2);
+    expect(await leaveTeam(team.team.id, { clientId: clientId(9) })).toBeNull();
+    expect(await leaveTeam(team.team.id, { clientId: clientId(2) })).toBe('p2');
+    expect((await getRoster(team.team.id))?.members.map((m) => m.name)).toEqual(['Host']);
+  });
+
+  it('hands the team over, and the creator key stops working', async () => {
+    const team = await create();
+    const ana = await join(team, 'Ana', 2);
+    await join(team, 'Bob', 3);
+    expect((await getRoster(team.team.id))?.owner).toBe('p1');
+    await expectStatus(transferOwnership(team.team.id, { joinId: ana.joinId }, 'p2'), 403);
+    await transferOwnership(team.team.id, { joinId: team.joinId }, 'p2');
+    expect((await getRoster(team.team.id))?.owner).toBe('p2');
+    await expectStatus(kickPlayer(team.team.id, { creatorKey: team.creatorKey }, 'p3'), 403);
+    expect(await kickPlayer(team.team.id, { joinId: ana.joinId }, 'p1')).toBe(true);
+  });
+
+  it('passes the team to the chosen player when the owner leaves', async () => {
+    const team = await create();
+    await join(team, 'Ana', 2);
+    await join(team, 'Bob', 3);
+    await leaveTeam(team.team.id, { slot: 'p1', joinId: team.joinId }, { newOwner: 'p3' });
+    expect((await getRoster(team.team.id))?.owner).toBe('p3');
+  });
+
+  it('passes the team to the first player left, or to the next one who joins', async () => {
+    const team = await create();
+    const ana = await join(team, 'Ana', 2);
+    await leaveTeam(team.team.id, { clientId: clientId(1) }, { newOwner: 'p9' });
+    expect((await getRoster(team.team.id))?.owner).toBe('p2');
+    await leaveTeam(team.team.id, { slot: 'p2', joinId: ana.joinId });
+    expect((await getRoster(team.team.id))?.owner).toBeNull();
+    const bob = await join(team, 'Bob', 3);
+    expect((await getRoster(team.team.id))?.owner).toBe(bob.slot);
+  });
+
+  it('keeps teams created before ownership could be passed on working with the creator key', async () => {
+    const team = await create();
+    await join(team, 'Ana', 2);
+    await (await getDb()).collection('teams').updateOne({}, { $unset: { ownerJoinId: '' } });
+    expect((await getRoster(team.team.id))?.owner).toBeNull();
+    await expectStatus(kickPlayer(team.team.id, { joinId: team.joinId }, 'p2'), 403);
+    await transferOwnership(team.team.id, { creatorKey: team.creatorKey }, 'p2');
+    expect((await getRoster(team.team.id))?.owner).toBe('p2');
   });
 
   it('saves only newer snapshots of current members', async () => {
@@ -136,7 +193,7 @@ describe('relay', () => {
     expect(room.entry('p2')?.persistedRev).toBe(7);
     expect(await room.isMember('p2', ana.joinId)).toBe(true);
 
-    await kickPlayer(team.team.id, team.creatorKey, 'p2');
+    await kickPlayer(team.team.id, { creatorKey: team.creatorKey }, 'p2');
     room.removeMember('p2');
     expect(await room.isMember('p2', ana.joinId)).toBe(false);
     expect(room.changesFor(null, 0, 0)).toEqual([]);

@@ -6,8 +6,8 @@ import { readItem, writeItem } from './storage';
  * - `clientId`: random id of this browser, sent when joining a team so the host
  *   can ban it. Created once.
  * - Per team: its name, the password (to share it again and to rejoin with one
- *   click from the lobby) and, for the team you created, the creator key. The creator key never leaves this browser except
- *   when you kick someone; losing it means you can no longer kick.
+ *   click from the lobby) and, for the team you created, the creator key. The creator key proves you own the team
+ *   (besides your session) until you hand it over; it only travels when you manage the team.
  */
 export interface LocalTeam {
   name: string;
@@ -60,6 +60,22 @@ export const localTeam = {
     const { creatorKey, name } = teams[teamId] ?? {};
     if (creatorKey && name) teams[teamId] = { name, creatorKey };
     else delete teams[teamId];
+    writeItem(TEAMS_KEY, JSON.stringify(teams));
+  },
+
+  /** Forgets a team entirely, creator key included (after leaving it or handing it over). */
+  remove(teamId: string) {
+    const teams = readTeams();
+    delete teams[teamId];
+    writeItem(TEAMS_KEY, JSON.stringify(teams));
+  },
+
+  /** Drops the creator key of a team you no longer own, keeping the rest. */
+  dropCreatorKey(teamId: string) {
+    const teams = readTeams();
+    if (!teams[teamId]) return;
+    const { creatorKey: _, ...rest } = teams[teamId];
+    teams[teamId] = rest;
     writeItem(TEAMS_KEY, JSON.stringify(teams));
   },
 

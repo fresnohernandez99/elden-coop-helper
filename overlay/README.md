@@ -6,7 +6,7 @@ It is not a real in-game overlay: it never touches the game process, it is just 
 
 ## Use
 
-1. Install it (see "Build") and start it. It lives in the **tray**: from there you get show/hide, click-through, settings and quit.
+1. Install it and start it. On Windows, the web lobby offers **Download for Windows**, a link to the newest installer in the GitHub releases; see also "Build". It lives in the **tray**: from there you get show/hide, click-through, settings and quit.
 2. On first start it asks for the **map URL** (where the Next.js app is served) and the shortcuts. Join your team (or play solo) once in the map window; the session cookie and your progress are kept.
 3. In Elden Ring set **Display mode → Borderless windowed**. Windows does not draw other windows over exclusive full screen.
 

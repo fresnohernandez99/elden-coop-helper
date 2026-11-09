@@ -55,6 +55,13 @@ export interface Session {
   tileUrl: string;
 }
 
+/** Who is in a team and who owns it (removes players and can hand the team over). */
+export interface TeamRoster {
+  members: { slot: PlayerId; name: string }[];
+  /** null when the owner is unknown (a team from before ownership could be passed on) or left. */
+  owner: PlayerId | null;
+}
+
 /** A team as listed in the lobby. */
 export interface TeamSummary extends TeamInfo {
   players: string[];

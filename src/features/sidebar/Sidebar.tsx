@@ -53,10 +53,10 @@ export function Sidebar() {
               <Link href="/" className={styles.link}>
                 lobby
               </Link>
-              {team && (
+              {team && !me && (
                 <>
                   {' · '}
-                  <LeaveButton teamId={team.id} label={me ? 'leave team' : 'stop watching'} />
+                  <StopWatching teamId={team.id} />
                 </>
               )}
             </p>
@@ -79,11 +79,8 @@ export function Sidebar() {
   );
 }
 
-/**
- * Leaves the team (a player frees their slot; joining again needs the password)
- * or stops watching. Your own progress stays in this browser.
- */
-function LeaveButton({ teamId, label }: { teamId: string; label: string }) {
+/** Ends a spectator session. Players leave the team from the Team panel. */
+function StopWatching({ teamId }: { teamId: string }) {
   const router = useRouter();
 
   const leave = async () => {
@@ -91,13 +88,13 @@ function LeaveButton({ teamId, label }: { teamId: string; label: string }) {
       await teamsApi.leave(teamId);
       router.replace('/');
     } catch (error) {
-      showToast(error instanceof Error ? error.message : 'Could not leave the team');
+      showToast(error instanceof Error ? error.message : 'Could not stop watching');
     }
   };
 
   return (
     <button type="button" className={styles.link} onClick={() => void leave()}>
-      {label}
+      stop watching
     </button>
   );
 }

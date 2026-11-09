@@ -56,12 +56,14 @@ On screens up to 800px wide the map takes the whole screen. Every action lives i
 ## Teams
 
 - `/` is the lobby, `/solo` the map on your own, `/team/<id>` the page to join or watch a team (the link the host shares) and `/map` the map of your team. Unknown routes return 404.
-- **Creating a team:** a name (up to 10 characters; names can repeat, the id is the MongoDB ObjectId) and your name. The server generates a **6-letter password** (A–Z without I and O) and a **creator key**, and you become player 1. The password is shown to share it; the creator key stays in your browser only.
+- **Creating a team:** a name (up to 10 characters; names can repeat, the id is the MongoDB ObjectId) and your name. The server generates a **6-letter password** (A–Z without I and O) and a **creator key**, and you become player 1 and the team **owner**. The password is shown to share it; the creator key stays in your browser only.
 - **Joining:** the team password (case does not matter) and your name. Up to **3 players** per team. Names are unique within a team. The same browser joining again gets its old slot back.
 - **Watching:** any team, from the lobby or its link, with **no password and no name**. Spectators see every player's progress and next destination but cannot mark anything; the server rejects any snapshot they send. Up to 20 spectators per team (per server instance on Vercel, so it is approximate).
-- **Removing players:** only the browser that created the team, which holds the creator key, sees "Remove from team" on the other players' cards. It removes the player and **bans their browser** (a random id created by each browser). It does not stop them from joining again from another browser. The creator key only travels in that request, and it is included in **Backup → Export** so it is not lost with the browser data.
-- **Leaving:** "leave team" frees your slot (joining again needs the password); "lobby" keeps you in the team.
-- **Your teams:** the browser saves the name and password of every team you join or create, and the lobby lists them to enter again with one click (with your last character name). The server gives you back your own slot. A session holds one team at a time, so this is how you switch between them; × removes a team from the list (the creator key of your own team is kept).
+- **Owner:** the member who can remove players and hand the team over, from the member list in the **Team** panel. Ownership follows the owner's membership (their session), and the creator key also proves it until the team changes hands; the key is included in **Backup → Export** so it is not lost with the browser data. Teams created before ownership could be passed on only know their owner by the creator key.
+- **Removing players:** "Remove" takes the player out and **bans their browser** (a random id created by each browser). It does not stop them from joining again from another browser.
+- **Handing the team over:** "Make owner" passes ownership to another member; the old creator key stops working.
+- **Leaving:** "Leave team" in the Team panel (or "Leave" in the lobby's list) frees your slot and **deletes your progress saved in that team** (it stays in your browser), and drops the team from your list. An owner picks who gets the team (by default the first remaining player); if nobody is left, the next player to join becomes the owner. "lobby" keeps you in the team.
+- **Your teams:** the browser saves the name and password of every team you join or create, and the lobby lists them to enter again with one click (with your last character name). The server gives you back your own slot. A session holds one team at a time, so this is how you switch between them; × only hides a team from the list (the creator key of your own team is kept).
 - Joining, creating and watching set an **httpOnly, signed session cookie** valid for 90 days (renewed once a day while you play, so it only expires after 90 days without opening the map), with the team, your slot and the id of your membership. After 10 wrong passwords from the same IP, joining is blocked for 15 minutes; each IP can create 5 teams per hour.
 - Secrets are never stored in clear: the team password with scrypt, the creator key and browser ids with SHA-256.
 
@@ -134,14 +136,14 @@ src/
 │   ├── team/[id]/page.tsx        join a team with its password, or watch it
 │   ├── map/page.tsx              the map of your team; requires a team session
 │   ├── not-found.tsx
-│   ├── api/teams/…               list, create, join, watch, kick, leave
+│   ├── api/teams/…               list, create, join, watch, members, kick, owner, leave
 │   ├── api/sync/route.ts         binary snapshot exchange
 │   ├── tiles/[map]/[tile]        cached proxy for map tiles
 │   └── game8-img/[host]/[...path] cached proxy for popup images
 ├── server/                       server-only code (import 'server-only')
 │   ├── config.ts                 reads and validates .env; session data for the client
 │   ├── db.ts                     MongoDB client, shared by every route
-│   ├── teams.ts                  teams in MongoDB: create, join, kick, leave, save snapshots
+│   ├── teams.ts                  teams in MongoDB: create, join, kick, hand over, leave, save snapshots
 │   ├── session.ts                signed session cookie (team, slot, membership)
 │   ├── rateLimit.ts              wrong passwords and new teams per IP
 │   ├── errors.ts, http.ts        HTTP errors, withErrors(), withViewer(), body readers
@@ -197,11 +199,13 @@ scripts/                          data generation
 | POST | `/api/teams` | `{ name, playerName, clientId }` → `{ team, slot, password, creatorKey }`; sets the session cookie |
 | POST | `/api/teams/<id>/join` | `{ password, playerName, clientId }` → `{ team, slot }`; sets the session cookie |
 | POST | `/api/teams/<id>/watch` | No body → `{ ok }`; sets a spectator session cookie |
-| POST | `/api/teams/<id>/kick` | `{ creatorKey, slot }` → `{ ok }`; removes and bans that player |
-| POST | `/api/teams/<id>/leave` | No body → `{ ok }`; frees your slot and clears the cookie |
+| GET | `/api/teams/<id>/members` | → `{ members: [{ slot, name }], owner }` |
+| POST | `/api/teams/<id>/kick` | `{ creatorKey?, slot }` → `{ ok }`; owner only (session or creator key); removes and bans that player |
+| POST | `/api/teams/<id>/owner` | `{ creatorKey?, slot }` → `{ ok }`; owner only; hands the team over to that member |
+| POST | `/api/teams/<id>/leave` | `{ creatorKey?, newOwner?, clientId? }` → `{ ok }`; frees your slot, deletes your saved progress and clears the cookie if it was for this team. Without a session in the team, `clientId` says who leaves |
 | POST | `/api/sync` | Binary, see `src/sync/protocol.ts` and `src/sync/snapshot.ts` |
 
-Errors are JSON `{ error }`: 400 invalid input or message, 401 wrong password, not in a team or no longer in it, 403 banned, not the creator, or a spectator tried to send progress, 404 team not found, 409 team full, name taken or catalog mismatch, 413 message too large, 429 too many attempts, 503 too many spectators.
+Errors are JSON `{ error }`: 400 invalid input or message, 401 wrong password, not in a team or no longer in it, 403 banned, not the owner, or a spectator tried to send progress, 404 team not found, 409 team full, name taken or catalog mismatch, 413 message too large, 429 too many attempts, 503 too many spectators.
 
 ## Data
 

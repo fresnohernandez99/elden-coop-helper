@@ -1,4 +1,4 @@
-import type { PlayerId, TeamInfo, TeamSummary } from '@/types/domain';
+import type { PlayerId, TeamInfo, TeamRoster, TeamSummary } from '@/types/domain';
 import { toApiError } from './http';
 
 export interface CreatedTeam {
@@ -38,10 +38,24 @@ export const teamsApi = {
   /** Read-only session for any team; no password. */
   watch: (teamId: string) => post<{ ok: true }>(teamUrl(teamId, 'watch')),
 
-  /** Only the team creator: removes a player and bans their browser. */
-  kick: (teamId: string, creatorKey: string, slot: PlayerId) =>
+  async members(teamId: string): Promise<TeamRoster> {
+    const res = await fetch(teamUrl(teamId, 'members'));
+    if (!res.ok) throw await toApiError(res);
+    return (await res.json()) as TeamRoster;
+  },
+
+  /** Only the team owner (by session or creator key): removes a player and bans their browser. */
+  kick: (teamId: string, slot: PlayerId, creatorKey?: string) =>
     post<{ ok: true }>(teamUrl(teamId, 'kick'), { creatorKey, slot }),
 
-  /** Leaves the team (players free their slot) and ends the session. */
-  leave: (teamId: string) => post<{ ok: true }>(teamUrl(teamId, 'leave')),
+  /** Only the team owner: hands the team over to another member. */
+  transfer: (teamId: string, slot: PlayerId, creatorKey?: string) =>
+    post<{ ok: true }>(teamUrl(teamId, 'owner'), { creatorKey, slot }),
+
+  /**
+   * Leaves the team (your slot and its saved progress are deleted) and ends the
+   * session. An owner hands the team to `newOwner`. From the lobby, `clientId` says who leaves.
+   */
+  leave: (teamId: string, options: { creatorKey?: string; newOwner?: PlayerId; clientId?: string } = {}) =>
+    post<{ ok: true }>(teamUrl(teamId, 'leave'), options),
 };

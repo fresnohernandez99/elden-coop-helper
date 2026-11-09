@@ -13,12 +13,15 @@ import styles from './Lobby.module.css';
 /**
  * Teams this browser joined or created, rejoined with one click using the saved
  * password and name. The server gives you back your own slot, so your progress
- * and place in the team are kept. Hidden when there are none.
+ * and place in the team are kept. "Leave" frees your slot and deletes your
+ * progress saved in that team (an owner's team goes to another player); "×"
+ * only hides it here. Hidden when there are none.
  */
 export function YourTeams({ currentTeamId }: { currentTeamId: string | null }) {
   const router = useRouter();
   const [teams, setTeams] = useState<[string, LocalTeam][]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [leaving, setLeaving] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   // After mounting: localStorage does not exist while rendering on the server.
@@ -45,6 +48,23 @@ export function YourTeams({ currentTeamId }: { currentTeamId: string | null }) {
     }
   }
 
+  async function leave(teamId: string, team: LocalTeam) {
+    if (leaving !== teamId) return setLeaving(teamId);
+    setBusy(teamId);
+    setError(null);
+    try {
+      await teamsApi.leave(teamId, { clientId: localTeam.clientId(), creatorKey: team.creatorKey });
+      localTeam.remove(teamId);
+      setTeams(localTeam.joinable());
+      if (teamId === currentTeamId) router.refresh();
+    } catch (err) {
+      setError(`${team.name}: ${err instanceof Error ? err.message : 'Could not leave'}`);
+    } finally {
+      setBusy(null);
+      setLeaving(null);
+    }
+  }
+
   if (teams.length === 0) return null;
 
   return (
@@ -60,7 +80,11 @@ export function YourTeams({ currentTeamId }: { currentTeamId: string | null }) {
           <li key={id} className={styles.team}>
             <span className={styles.teamInfo}>
               <strong>{team.name}</strong>
-              {team.creatorKey && <small>Created by you</small>}
+              {leaving === id ? (
+                <small>Leave and delete your progress in it? Click again</small>
+              ) : (
+                team.creatorKey && <small>Created by you</small>
+              )}
             </span>
             {id === currentTeamId ? (
               <Link href="/map" className={styles.joinLink}>
@@ -71,6 +95,14 @@ export function YourTeams({ currentTeamId }: { currentTeamId: string | null }) {
                 {busy === id ? 'Joining…' : 'Enter'}
               </Button>
             )}
+            <Button
+              size="small"
+              disabled={busy !== null}
+              onClick={() => void leave(id, team)}
+              onBlur={() => setLeaving(null)}
+            >
+              {leaving === id ? 'Leave?' : 'Leave'}
+            </Button>
             <button
               type="button"
               className={styles.forget}

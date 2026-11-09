@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { localTeam } from '@/features/coop/localTeam';
 import { CreateTeamForm } from './CreateTeamForm';
+import { OverlayDownload } from './OverlayDownload';
 import styles from './Lobby.module.css';
 import { TeamList } from './TeamList';
 import { YourTeams } from './YourTeams';
@@ -39,6 +40,7 @@ export function Lobby({ current }: { current: CurrentTeam | null }) {
           <Link href="/solo" className={styles.secondaryLink}>
             Play solo
           </Link>
+          <OverlayDownload />
         </div>
         <YourTeams currentTeamId={current && !current.spectator ? current.teamId : null} />
         <CreateTeamForm />

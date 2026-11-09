@@ -16,6 +16,9 @@ export const TEAM_PASSWORD_LENGTH = 6;
 export const TEAM_PASSWORD_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 export const TEAMS_PAGE_SIZE = 20;
 
+/** GitHub repo whose releases carry the Windows overlay installer (tags `overlay-v…`). */
+export const OVERLAY_REPO = 'fresnohernandez99/elden-coop-helper';
+
 /** Your progress is saved to the database at most this often, and only when it changed. */
 export const PERSIST_INTERVAL_MS = 2 * 60_000;
 

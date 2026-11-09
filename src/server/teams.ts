@@ -10,7 +10,7 @@ import {
   TEAM_PASSWORD_LENGTH,
   TEAMS_PAGE_SIZE,
 } from '@/config/constants';
-import type { PlayerId, TeamInfo, TeamSummary } from '@/types/domain';
+import type { PlayerId, TeamInfo, TeamRoster, TeamSummary } from '@/types/domain';
 import { getDb } from './db';
 import { HttpError } from './errors';
 
@@ -23,6 +23,12 @@ import { HttpError } from './errors';
  *
  * Secrets are never stored in clear: the team password with scrypt (it is short),
  * the creator key and browser ids with SHA-256 (they are long and random).
+ *
+ * The owner (who can remove players and hand the team over) is the member whose
+ * join id is `ownerJoinId`, so ownership follows the session and can be passed on.
+ * The creator key, kept in the creator's browser, also proves ownership until the
+ * team changes hands; teams created before `ownerJoinId` existed only have the key.
+ * A team whose owner left with nobody to take over goes to the next player who joins.
  */
 
 interface MemberDoc {
@@ -44,7 +50,9 @@ interface TeamDoc {
   name: string;
   passwordHash: string;
   passwordSalt: string;
-  creatorKeyHash: string;
+  /** Removed once the team changes hands. */
+  creatorKeyHash?: string;
+  ownerJoinId?: string;
   members: MemberDoc[];
   banned: string[];
   snapshots: Partial<Record<PlayerId, SnapshotDoc>>;
@@ -69,6 +77,12 @@ export interface Team {
   info: TeamInfo;
   members: TeamMember[];
   snapshots: SavedSnapshot[];
+}
+
+/** Who asks for an owner action: their membership (from the session) and/or the creator key. */
+export interface OwnerProof {
+  joinId?: string;
+  creatorKey?: unknown;
 }
 
 /** What the browser keeps after joining. */
@@ -136,12 +150,27 @@ const toInfo = (doc: Pick<TeamDoc, '_id' | 'name'>): TeamInfo => ({ id: doc._id.
 
 const toMember = ({ slot, name, joinId }: MemberDoc): TeamMember => ({ slot, name, joinId });
 
+type OwnerFields = Pick<TeamDoc, 'members' | 'ownerJoinId' | 'creatorKeyHash'>;
+
+const ownerOf = (doc: OwnerFields): MemberDoc | undefined =>
+  doc.ownerJoinId ? doc.members.find((m) => m.joinId === doc.ownerJoinId) : undefined;
+
+/** Nobody can manage the team: its owner left and there is no creator key. */
+const isOwnerless = (doc: OwnerFields) => !doc.creatorKeyHash && !ownerOf(doc);
+
+function isOwner(doc: OwnerFields, proof: OwnerProof): boolean {
+  if (proof.joinId && ownerOf(doc)?.joinId === proof.joinId) return true;
+  return typeof proof.creatorKey === 'string' && !!doc.creatorKeyHash && sameSecret(sha256(proof.creatorKey), doc.creatorKeyHash);
+}
+
+const OWNER_PROJECTION = { members: 1, ownerJoinId: 1, creatorKeyHash: 1 } as const;
+
 // ---- operations ----
 
 export interface CreatedTeam extends Membership {
   /** Shown once to the host, who shares it with friends. */
   password: string;
-  /** Lets the host kick players. Only returned here; the browser keeps it. */
+  /** Also proves ownership, until the team changes hands. Only returned here; the browser keeps it. */
   creatorKey: string;
 }
 
@@ -162,6 +191,7 @@ export async function createTeam(input: { name: unknown; playerName: unknown; cl
     passwordHash: await hashPassword(password, passwordSalt),
     passwordSalt,
     creatorKeyHash: sha256(creatorKey),
+    ownerJoinId: joinId,
     members: [{ slot: 'p1', name: playerName, joinId, clientIdHash: sha256(clientId) }],
     banned: [],
     snapshots: {},
@@ -201,6 +231,15 @@ export async function getTeam(teamId: string): Promise<Team | null> {
   return { info: toInfo(doc), members: doc.members.map(toMember), snapshots };
 }
 
+/** Members by name and the owner's slot (null if unknown or gone), or null if the team does not exist. */
+export async function getRoster(teamId: string): Promise<TeamRoster | null> {
+  const _id = parseTeamId(teamId);
+  if (!_id) return null;
+  const doc = await (await collection()).findOne({ _id }, { projection: { members: 1, ownerJoinId: 1 } });
+  if (!doc) return null;
+  return { members: doc.members.map(({ slot, name }) => ({ slot, name })), owner: ownerOf(doc)?.slot ?? null };
+}
+
 /** Current members only (cheaper than getTeam), or null if the team does not exist. */
 export async function getMembers(teamId: string): Promise<TeamMember[] | null> {
   const _id = parseTeamId(teamId);
@@ -229,7 +268,7 @@ export async function joinTeam(
   for (let attempt = 0; attempt < MAX_JOIN_ATTEMPTS; attempt++) {
     const doc = await teams.findOne(
       { _id },
-      { projection: { name: 1, passwordHash: 1, passwordSalt: 1, members: 1, banned: 1 } },
+      { projection: { name: 1, passwordHash: 1, passwordSalt: 1, banned: 1, ...OWNER_PROJECTION } },
     );
     if (!doc) throw new HttpError(404, 'This team does not exist');
     if (attempt === 0) {
@@ -245,7 +284,13 @@ export async function joinTeam(
       }
       await teams.updateOne(
         { _id, members: { $elemMatch: { slot: mine.slot, clientIdHash } } },
-        { $set: { 'members.$.name': playerName, updatedAt: new Date() } },
+        {
+          $set: {
+            'members.$.name': playerName,
+            updatedAt: new Date(),
+            ...(isOwnerless(doc) && { ownerJoinId: mine.joinId }),
+          },
+        },
       );
       return { team: toInfo(doc), slot: mine.slot, joinId: mine.joinId };
     }
@@ -260,23 +305,30 @@ export async function joinTeam(
     // Only if nobody took the slot (or got banned) since the read; otherwise read again.
     const { modifiedCount } = await teams.updateOne(
       { _id, 'members.slot': { $ne: slot }, 'members.clientIdHash': { $ne: clientIdHash }, banned: { $ne: clientIdHash } },
-      { $push: { members: { slot, name: playerName, joinId, clientIdHash } }, $set: { updatedAt: new Date() } },
+      {
+        $push: { members: { slot, name: playerName, joinId, clientIdHash } },
+        $set: { updatedAt: new Date(), ...(isOwnerless(doc) && { ownerJoinId: joinId }) },
+      },
     );
     if (modifiedCount === 1) return { team: toInfo(doc), slot, joinId };
   }
   throw new HttpError(409, 'The team changed while joining; try again');
 }
 
-/** The host removes a player and bans their browser. Returns false if they were not in the team. */
-export async function kickPlayer(teamId: string, creatorKey: unknown, slot: PlayerId): Promise<boolean> {
+/** The team as its owner sees it; throws unless the proof is the owner's. */
+async function findAsOwner(teamId: string, proof: OwnerProof) {
   const _id = parseTeamId(teamId);
   if (!_id) throw new HttpError(404, 'This team does not exist');
   const teams = await collection();
-  const doc = await teams.findOne({ _id }, { projection: { creatorKeyHash: 1, members: 1 } });
+  const doc = await teams.findOne({ _id }, { projection: OWNER_PROJECTION });
   if (!doc) throw new HttpError(404, 'This team does not exist');
-  if (typeof creatorKey !== 'string' || !sameSecret(sha256(creatorKey), doc.creatorKeyHash)) {
-    throw new HttpError(403, 'Only the team creator can remove players');
-  }
+  if (!isOwner(doc, proof)) throw new HttpError(403, 'Only the team owner can do that');
+  return { _id, teams, doc };
+}
+
+/** The owner removes a player and bans their browser. Returns false if they were not in the team. */
+export async function kickPlayer(teamId: string, proof: OwnerProof, slot: PlayerId): Promise<boolean> {
+  const { _id, teams, doc } = await findAsOwner(teamId, proof);
   const member = doc.members.find((m) => m.slot === slot);
   if (!member) return false;
   await teams.updateOne(
@@ -291,14 +343,60 @@ export async function kickPlayer(teamId: string, creatorKey: unknown, slot: Play
   return true;
 }
 
-/** You leave the team: your slot and saved snapshot are freed. */
-export async function leaveTeam(teamId: string, slot: PlayerId, joinId: string): Promise<void> {
-  const _id = parseTeamId(teamId);
-  if (!_id) return;
-  await (await collection()).updateOne(
-    { _id, members: { $elemMatch: { slot, joinId } } },
-    { $pull: { members: { slot, joinId } }, $unset: { [`snapshots.${slot}`]: '' }, $set: { updatedAt: new Date() } },
+/**
+ * The owner hands the team over to another member. The creator key stops
+ * working, so the new owner is the only one who can manage it.
+ */
+export async function transferOwnership(teamId: string, proof: OwnerProof, slot: PlayerId): Promise<void> {
+  const { _id, teams, doc } = await findAsOwner(teamId, proof);
+  const member = doc.members.find((m) => m.slot === slot);
+  if (!member) throw new HttpError(404, 'That player is not in the team');
+  const { matchedCount } = await teams.updateOne(
+    { _id, members: { $elemMatch: { slot, joinId: member.joinId } } },
+    { $set: { ownerJoinId: member.joinId, updatedAt: new Date() }, $unset: { creatorKeyHash: '' } },
   );
+  if (matchedCount === 0) throw new HttpError(409, 'The team changed; try again');
+}
+
+/** Who leaves: a player by their session, or a browser by its clientId (from the lobby). */
+export type Leaver = { slot: PlayerId; joinId: string } | { clientId: unknown };
+
+/**
+ * You leave the team: your slot and saved snapshot are deleted. If you owned
+ * it, it goes to `newOwner` (or the first remaining player); with nobody left,
+ * to the next player who joins. Returns the slot freed, or null if you were not in the team.
+ */
+export async function leaveTeam(
+  teamId: string,
+  leaver: Leaver,
+  options: { creatorKey?: unknown; newOwner?: unknown } = {},
+): Promise<PlayerId | null> {
+  const _id = parseTeamId(teamId);
+  if (!_id) return null;
+  const teams = await collection();
+  const doc = await teams.findOne({ _id }, { projection: OWNER_PROJECTION });
+  if (!doc) return null;
+  const member =
+    'clientId' in leaver
+      ? doc.members.find((m) => m.clientIdHash === sha256(cleanClientId(leaver.clientId)))
+      : doc.members.find((m) => m.slot === leaver.slot && m.joinId === leaver.joinId);
+  if (!member) return null;
+  const { slot, joinId } = member;
+
+  const set: Partial<TeamDoc> = { updatedAt: new Date() };
+  const unset: Record<string, ''> = { [`snapshots.${slot}`]: '' };
+  if (isOwner(doc, { joinId, creatorKey: options.creatorKey })) {
+    const rest = doc.members.filter((m) => m !== member);
+    const heir = rest.find((m) => m.slot === options.newOwner) ?? rest[0];
+    if (heir) set.ownerJoinId = heir.joinId;
+    else unset.ownerJoinId = '';
+    unset.creatorKeyHash = '';
+  }
+  await teams.updateOne(
+    { _id, members: { $elemMatch: { slot, joinId } } },
+    { $pull: { members: { slot, joinId } }, $unset: unset, $set: set },
+  );
+  return slot;
 }
 
 /**

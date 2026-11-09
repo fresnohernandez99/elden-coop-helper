@@ -15,3 +15,36 @@
   letter-spacing: 2px;
   cursor: pointer;
 }
+
+.members {
+  display: grid;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.member {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.memberName {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.memberActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.leave {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+}

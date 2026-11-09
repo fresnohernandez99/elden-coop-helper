@@ -204,3 +204,15 @@
   line-height: 1;
   cursor: pointer;
 }
+
+.overlayDownload {
+  margin: 0;
+  font-size: 13px;
+  text-align: center;
+  color: var(--muted);
+}
+
+.overlayDownload a {
+  color: var(--gold);
+  font-weight: 600;
+}

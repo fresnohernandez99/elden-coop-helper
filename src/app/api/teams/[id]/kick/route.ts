@@ -13,8 +13,8 @@ interface TeamParams {
 }
 
 /**
- * POST /api/teams/<id>/kick { creatorKey, slot } — the team creator removes a
- * player and bans their browser. The creator key only travels in this request.
+ * POST /api/teams/<id>/kick { creatorKey?, slot } — the team owner (by session,
+ * or by the creator key kept in their browser) removes a player and bans their browser.
  */
 export const POST = withErrors(async (request: NextRequest, { params }: TeamParams) => {
   const { id } = await params;
@@ -23,10 +23,9 @@ export const POST = withErrors(async (request: NextRequest, { params }: TeamPara
   if (!PLAYER_IDS.includes(slot)) throw new HttpError(400, 'Invalid player');
 
   const viewer = await getSessionViewer();
-  if (viewer?.kind === 'player' && viewer.teamId === id && viewer.player === slot) {
-    throw new HttpError(400, 'You cannot remove yourself; leave the team instead');
-  }
-  if (!(await kickPlayer(id, body.creatorKey, slot))) throw new HttpError(404, 'That player is not in the team');
+  const playing = viewer?.kind === 'player' && viewer.teamId === id ? viewer : null;
+  if (playing?.player === slot) throw new HttpError(400, 'You cannot remove yourself; leave the team instead');
+  if (!(await kickPlayer(id, { joinId: playing?.joinId, creatorKey: body.creatorKey }, slot))) throw new HttpError(404, 'That player is not in the team');
   (await relay.loaded(id))?.removeMember(slot);
   return json({ ok: true });
 });
